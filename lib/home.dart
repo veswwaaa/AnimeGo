@@ -1,6 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'api_sevice.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -13,38 +13,47 @@ class _MyHomePageState extends State<Homepage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _timer;
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _banners = [
-    {
-      'image': 'assets/images/posterjjk.jpg',
-      'title': 'Jujutsu Kaisen',
-      'japaneseTitle': '呪術廻戦',
-      'synopsis':
-          'Yuji Itadori is a boy with tremendous physical strength, though he lives a completely ordinary...',
-      'genre': ['Fantasy', 'Action', 'Supernatural'],
-    },
-    {
-      'image': 'assets/images/gambar2.jpg',
-      'title': 'Demon Slayer',
-      'japaneseTitle': '呪術廻戦',
-      'synopsis':
-          'Ever since the death of his father, the burden of supporting the family has fallen upon Tanjirou',
-      'genre': ['Action', 'Fantasy', 'Supernatural'],
-    },
-    {
-      'image': 'assets/images/gaciakuta.jpg',
-      'title': 'Gachiakuta',
-      'japaneseTitle': '呪術廻戦',
-      'synopsis':
-          'Set in a world divided between a wealthy floating city and a surface-level slum, Gachiakuta follows Rudo, a boy who survives by scavenging "trash" that others discard.',
-      'genre': ['Action', 'Comedy', 'Supernatural'],
-    },
-  ];
+  List<Map<String, dynamic>> _banners = [];
 
   @override
   void initState() {
     super.initState();
+    _loadDataFromApi();
     _startAutoScroll();
+  }
+
+  Future<void> _loadDataFromApi() async {
+    try {
+      final apiData = await ApiService.fetchData();
+
+      if (apiData != null) {
+        setState(() {
+          // Tambahkan data dari API ke banner list
+          _banners.add({
+            'image': apiData['images']?['jpg']?['large_image_url'] ?? '',
+            'title': apiData['title'] ?? 'No Title',
+            'japaneseTitle':
+                apiData['title'] ??
+                'No Title', // API tidak punya japanese title
+            'synopsis': apiData['synopsis'] ?? 'No synopsis available',
+            'genre': apiData['genres'] ?? [],
+            'isFromApi': true, // flag untuk tahu ini dari API
+          });
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _startAutoScroll() {
@@ -66,42 +75,107 @@ class _MyHomePageState extends State<Homepage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            SizedBox(
-              height: 450,
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemCount: _banners.length,
-                itemBuilder: (context, index) {
-                  return _buildBanner(_banners[index]);
-                },
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 255, 153, 0),
               ),
+            )
+          : Stack(
+              children: [
+                SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 450,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentPage = index;
+                            });
+                          },
+                          itemCount: _banners.length,
+                          itemBuilder: (context, index) {
+                            return _buildBanner(_banners[index]);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                //dot
+                Positioned(
+                  bottom: 26,
+                  left: 20,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: List.generate(
+                        _banners.length,
+                        (index) => GestureDetector(
+                          onTap: () => _pageController.animateToPage(
+                            index,
+                            duration: Duration(milliseconds: 800),
+                            curve: Curves.easeInOut,
+                          ),
+                          child: AnimatedContainer(
+                            duration: Duration(milliseconds: 300),
+                            width: _currentPage == index ? 30 : 8,
+                            height: 8,
+                            margin: EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              // shape: BoxShape.circle,
+                              borderRadius: BorderRadius.circular(8),
+                              color: _currentPage == index
+                                  ? Color.fromARGB(255, 255, 153, 0)
+                                  : Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-
-            //dots
-          ],
-        ),
-      ),
     );
   }
 
   //content
   Widget _buildBanner(Map<String, dynamic> data) {
+    bool isFromApi = data['isFromApi'] ?? false;
+
     return Stack(
       children: [
-        Image.asset(
-          data['image'],
-          height: 450,
-          width: double.infinity,
-          fit: BoxFit.cover,
-        ),
+        // Gunakan Image.network jika dari API, Image.asset jika lokal
+        isFromApi
+            ? Image.network(
+                data['image'],
+                height: 450,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 450,
+                    color: Colors.grey[900],
+                    child: Center(
+                      child: Icon(
+                        Icons.broken_image,
+                        color: Colors.white,
+                        size: 50,
+                      ),
+                    ),
+                  );
+                },
+              )
+            : Image.asset(
+                data['image'],
+                height: 450,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
         Container(
           height: 450,
           decoration: BoxDecoration(
@@ -181,53 +255,27 @@ class _MyHomePageState extends State<Homepage> {
 
                 Text(
                   data['synopsis'],
-                  style: const TextStyle(
-                    color:  Colors.white,
-                    fontSize: 12
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
-                  onPressed: () => print('Button Triggered'), 
-                  icon:  Icon(Icons.play_arrow, color: Colors.white,),
-                  label: Text('Watch Now',style: TextStyle(color:  Colors.white, fontSize: 12,fontWeight: FontWeight.bold) ),
-                  style: ElevatedButton.styleFrom( 
+                  onPressed: () => print('Button Triggered'),
+                  icon: Icon(Icons.play_arrow, color: Colors.white),
+                  label: Text(
+                    'Watch Now',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
                     backgroundColor: const Color.fromARGB(255, 255, 153, 0),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(50),
-                    )
-                  ),
-                  ),
-
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: 15) ,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(
-                      _banners.length,
-                      (index) => GestureDetector(
-                        onTap: () => _pageController.animateToPage( 
-                          index,
-                          duration: Duration(milliseconds: 800),
-                          curve: Curves.easeInOut
-                        ),
-                        child: AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          width: _currentPage == index ? 20 : 8 ,
-                          height: 8,
-                          margin: EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration( 
-                            // shape: BoxShape.circle,
-                            borderRadius: BorderRadius.circular(8),
-                            color: _currentPage == index ? Color.fromARGB(255, 255, 153, 0)
-                            : Colors.white
-                          ),
-                          
-                        ),
-                      )
-                      )
                     ),
-                )
+                  ),
+                ),
               ],
             ),
           ),

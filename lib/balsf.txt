@@ -1,0 +1,29 @@
+Padding(
+                    padding: EdgeInsets.symmetric(vertical: 15) ,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: List.generate(
+                      _banners.length,
+                      (index) => GestureDetector(
+                        onTap: () => _pageController.animateToPage( 
+                          index,
+                          duration: Duration(milliseconds: 800),
+                          curve: Curves.easeInOut
+                        ),
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 300),
+                          width: _currentPage == index ? 20 : 8 ,
+                          height: 8,
+                          margin: EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration( 
+                            // shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(8),
+                            color: _currentPage == index ? Color.fromARGB(255, 255, 153, 0)
+                            : Colors.white
+                          ),
+                          
+                        ),
+                      )
+                      )
+                    ),
+                )
