@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'api_sevice.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -9,7 +10,8 @@ class Homepage extends StatefulWidget {
   State<Homepage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<Homepage> {
+class _MyHomePageState extends State<Homepage>
+    with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _timer;
@@ -17,10 +19,49 @@ class _MyHomePageState extends State<Homepage> {
 
   List<Map<String, dynamic>> _banners = [];
 
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  double _currentPageValue = 0.0;
+
+  bool _showContent = true;
+
   @override
   void initState() {
     super.initState();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
+
+    _pageController.addListener(() {
+      if (!mounted) return;
+      final page = _pageController.page;
+      if (page == null || page.isNaN || page.isInfinite) return; // <-- validasi
+      setState(() {
+        _currentPageValue = page;
+      });
+    });
+
     _loadDataFromApi();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDataFromApi() async {
@@ -58,6 +99,16 @@ class _MyHomePageState extends State<Homepage> {
     if (_banners.isEmpty) return;
 
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      // sembunyikan content dulu
+      setState(() {
+        _showContent = false;
+      });
+
       if (_currentPage < _banners.length - 1) {
         _currentPage++;
       } else {
@@ -67,11 +118,23 @@ class _MyHomePageState extends State<Homepage> {
       if (_pageController.hasClients) {
         _pageController.animateToPage(
           _currentPage,
-          duration: const Duration(milliseconds: 800),
+          duration: const Duration(milliseconds: 600),
           curve: Curves.easeInOut,
         );
+
+        // tunggu slide selesai baru tampilkan content + play animasi
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (!mounted) return;
+          setState(() {
+            _showContent = true;
+          });
+          _animationController.reset();
+          _animationController.forward();
+        });
       }
     });
+
+    _animationController.forward();
   }
 
   @override
@@ -84,24 +147,56 @@ class _MyHomePageState extends State<Homepage> {
               ),
             )
           : _banners.isEmpty
-            ? Center( child: Text('no data available', style: TextStyle(color: Colors.white),),)
-            : Stack(
+          ? Center(
+              child: Text(
+                'no data available',
+                style: TextStyle(color: Colors.white),
+              ),
+            )
+          : Stack(
               children: [
                 SingleChildScrollView(
                   child: Column(
                     children: [
                       SizedBox(
-                        height: 450,
+                        height: 420,
                         child: PageView.builder(
                           controller: _pageController,
                           onPageChanged: (index) {
                             setState(() {
                               _currentPage = index;
                             });
+                            // _animationController.reset();
+                            // _animationController.forward();
                           },
                           itemCount: _banners.length,
                           itemBuilder: (context, index) {
-                            return _buildBanner(_banners[index]);
+                            double distance = 0.0;
+                            double darkness = 0.0;
+
+                            if (!_currentPageValue.isNaN &&
+                                !_currentPageValue.isInfinite) {
+                              distance = (_currentPageValue - index).abs();
+                              darkness = distance.clamp(0.0, 1.0);
+                            }
+
+                            // content hanya muncul di banner aktif dan saat _showContent true
+                            bool isActiveBanner =
+                                index == _currentPage && _showContent;
+
+                            return Stack(
+                              children: [
+                                _buildBanner(
+                                  _banners[index],
+                                  showContent: isActiveBanner,
+                                ),
+                                Positioned.fill(
+                                  child: Container(
+                                    color: Colors.black.withOpacity(darkness),
+                                  ),
+                                ),
+                              ],
+                            );
                           },
                         ),
                       ),
@@ -148,31 +243,41 @@ class _MyHomePageState extends State<Homepage> {
   }
 
   //content
-  Widget _buildBanner(Map<String, dynamic> data) {
-    bool isFromApi = data['isFromApi'] ?? false;
-
+  Widget _buildBanner(Map<String, dynamic> data, {bool showContent = true}) {
+    // validasi ketat
+    // double safeOpacity = 1.0;
+    // if (!showContent.isNaN && !showContent.isInfinite) {
+    //   safeOpacity = showContent.clamp(0.0, 1.0);
+    // }
 
     return Stack(
       children: [
-        isFromApi
-            ? Image.network(
-                data['image'],
+        data['image'] != null
+            ? CachedNetworkImage(
+                imageUrl: data['image'],
                 height: 450,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 450,
-                    color: Colors.grey[900],
-                    child: Center(
-                      child: Icon(
-                        Icons.broken_image,
-                        color: Colors.white,
-                        size: 50,
-                      ),
+                placeholder: (context, url) => Container(
+                  height: 450,
+                  color: Colors.grey[900],
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Color.fromARGB(255, 255, 153, 0),
                     ),
-                  );
-                },
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 450,
+                  color: Colors.grey[900],
+                  child: const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      color: Colors.white,
+                      size: 50,
+                    ),
+                  ),
+                ),
               )
             : Image.asset(
                 data['image'],
@@ -201,89 +306,132 @@ class _MyHomePageState extends State<Homepage> {
           ),
         ),
 
-        Positioned(
-          bottom: 70,
-          left: 20,
-          child: SizedBox(
-            width: 350,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                //genre
-                Wrap(
-                  spacing: 8,
-                  children: data['genre'].map<Widget>((genre) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+        // Container(
+        //   height: 450,
+        //   color: Colors.black.withOpacity(_pageFraction * 0.85),
+        // ),
+        if (showContent)
+          Positioned(
+            bottom: 70,
+            left: 20,
+            child: Opacity(
+              opacity: 1.0,
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: child,
+                    ),
+                  );
+                },
+                child: SizedBox(
+                  width: 350,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      //genre
+                      Wrap(
+                        spacing: 8,
+                        children: data['genre'].map<Widget>((genre) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              genre,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(20),
+                      SizedBox(height: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [],
                       ),
-                      child: Text(
-                        genre,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
+                      const SizedBox(height: 2),
+                      SizedBox(
+                        width: 450,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 20),
+                          child: Text(
+                            data['title'],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                SizedBox(height: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['japaneseTitle'] ?? '',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  data['title'],
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
+                      const SizedBox(height: 4),
 
-                Text(
-                  data['synopsis'],
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () => print('Button Triggered'),
-                  icon: Icon(Icons.play_arrow, color: Colors.white),
-                  label: Text(
-                    'Watch Now',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                      Text(
+                        data['japaneseTitle'] ?? '',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      SizedBox(height: 4),
+
+                      SizedBox(
+                        width: 250,
+                        child: Text(
+                          data['synopsis'],
+                          maxLines: 2,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        onPressed: () => print('Button Triggered'),
+                        icon: Icon(Icons.play_arrow, color: Colors.white),
+                        label: Text(
+                          'Watch Now',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            255,
+                            153,
+                            0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(50),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 255, 153, 0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                  ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
