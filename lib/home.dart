@@ -21,33 +21,31 @@ class _MyHomePageState extends State<Homepage> {
   void initState() {
     super.initState();
     _loadDataFromApi();
-    _startAutoScroll();
   }
 
   Future<void> _loadDataFromApi() async {
     try {
       final apiData = await ApiService.fetchData();
 
-      if (apiData != null) {
+      if (apiData.isNotEmpty) {
         setState(() {
-          // Tambahkan data dari API ke banner list
-          _banners.add({
-            'image': apiData['images']?['jpg']?['large_image_url'] ?? '',
-            'title': apiData['title'] ?? 'No Title',
-            'japaneseTitle':
-                apiData['title'] ??
-                'No Title', // API tidak punya japanese title
-            'synopsis': apiData['synopsis'] ?? 'No synopsis available',
-            'genre': apiData['genres'] ?? [],
-            'isFromApi': true, // flag untuk tahu ini dari API
-          });
+          for (var anime in apiData) {
+            _banners.add({
+              'image': anime['images']['jpg']['large_image_url'],
+              'title': anime['title'],
+              'japaneseTitle': anime['japanese_title'],
+              'synopsis': anime['synopsis'],
+              'genre': List<String>.from(anime['genres']),
+              'score': anime['score'],
+              'sourceUrl': anime['sourceUrl'],
+              'isFromApi': true,
+            });
+          }
           _isLoading = false;
         });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
+        _startAutoScroll();
       }
+      ;
     } catch (e) {
       print('Error loading data: $e');
       setState(() {
@@ -57,6 +55,8 @@ class _MyHomePageState extends State<Homepage> {
   }
 
   void _startAutoScroll() {
+    if (_banners.isEmpty) return;
+
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (_currentPage < _banners.length - 1) {
         _currentPage++;
@@ -64,11 +64,13 @@ class _MyHomePageState extends State<Homepage> {
         _currentPage = 0;
       }
 
-      _pageController.animateToPage(
-        _currentPage,
-        duration: const Duration(milliseconds: 800),
-        curve: Curves.easeInOut,
-      );
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+      }
     });
   }
 
@@ -81,7 +83,9 @@ class _MyHomePageState extends State<Homepage> {
                 color: Color.fromARGB(255, 255, 153, 0),
               ),
             )
-          : Stack(
+          : _banners.isEmpty
+            ? Center( child: Text('no data available', style: TextStyle(color: Colors.white),),)
+            : Stack(
               children: [
                 SingleChildScrollView(
                   child: Column(
@@ -147,9 +151,9 @@ class _MyHomePageState extends State<Homepage> {
   Widget _buildBanner(Map<String, dynamic> data) {
     bool isFromApi = data['isFromApi'] ?? false;
 
+
     return Stack(
       children: [
-        // Gunakan Image.network jika dari API, Image.asset jika lokal
         isFromApi
             ? Image.network(
                 data['image'],
@@ -233,10 +237,10 @@ class _MyHomePageState extends State<Homepage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      data['japaneseTitle'],
+                      data['japaneseTitle'] ?? '',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: 18,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
