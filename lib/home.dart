@@ -301,16 +301,16 @@ class _MyHomePageState extends State<Homepage>
             ),
           ),
         ),
-        Container(
-          height: 450,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-            ),
-          ),
-        ),
+        // Container(
+        //   height: 450,
+        //   decoration: BoxDecoration(
+        //     gradient: LinearGradient(
+        //       begin: Alignment.bottomCenter,
+        //       end: Alignment.topCenter,
+        //       colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+        //     ),
+        //   ),
+        // ),
 
         // Container(
         //   height: 450,
