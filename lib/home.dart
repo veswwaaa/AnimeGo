@@ -32,7 +32,7 @@ class _MyHomePageState extends State<Homepage>
 
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -122,19 +122,25 @@ class _MyHomePageState extends State<Homepage>
           curve: Curves.easeInOut,
         );
 
-        // tunggu slide selesai baru tampilkan content + play animasi
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (!mounted) return;
-          setState(() {
-            _showContent = true;
-          });
-          _animationController.reset();
-          _animationController.forward();
+        setState((){
+          _showContent = true;
         });
+        _animationController.reset();
+        _animationController.forward();
+
+        // tunggu slide selesai baru tampilkan content + play animasi
+        // Future.delayed(const Duration(milliseconds: 600), () {
+        //   if (!mounted) return;
+        //   setState(() {
+        //     _showContent = true;
+        //   });
+        //   _animationController.reset();
+        //   _animationController.forward();
+        // });
       }
     });
 
-    _animationController.forward();
+    // _animationController.forward();
   }
 
   @override
