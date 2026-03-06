@@ -36,6 +36,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.9.0
   http: ^1.6.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.5
   
 
 dev_dependencies:

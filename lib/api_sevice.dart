@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 
 class ApiService {
   static Future<Map<String, dynamic>?> fetchData() async {
     try {
       final response = await http.get(
         Uri.parse(
-          'https://kevinapienim.vercel.app/api/nimegami/anime?url=aHR0cHM6Ly9uaW1lZ2FtaS5pZC9qdWp1dHN1LWthaXNlbi1zaGltZXRzdS1rYWl5dXUtemVucGVuLXN1Yi1pbmRvLw==',
+          '$apiBaseUrl/api/nimegami/anime?url=aHR0cHM6Ly9uaW1lZ2FtaS5pZC9qdWp1dHN1LWthaXNlbi1zaGltZXRzdS1rYWl5dXUtemVucGVuLXN1Yi1pbmRvLw==',
         ),
       );
 
