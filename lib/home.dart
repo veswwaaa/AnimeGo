@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'api_sevice.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -71,8 +70,10 @@ class _MyHomePageState extends State<Homepage>
       if (apiData.isNotEmpty) {
         setState(() {
           for (var anime in apiData) {
+            final imageUrl =
+                (anime['images']?['jpg']?['large_image_url'] as String?) ?? '';
             _banners.add({
-              'image': anime['images']['jpg']['large_image_url'],
+              'image': imageUrl,
               'title': anime['title'],
               'japaneseTitle': anime['japanese_title'],
               'synopsis': anime['synopsis'],
@@ -256,41 +257,42 @@ class _MyHomePageState extends State<Homepage>
     //   safeOpacity = showContent.clamp(0.0, 1.0);
     // }
 
+    final imagePath = ((data['image'] as String?) ?? '').trim();
+
     return Stack(
       children: [
-        data['image'] != null
-            ? CachedNetworkImage(
-                imageUrl: data['image'],
-                height: 450,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  height: 450,
-                  color: Colors.grey[900],
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: Color.fromARGB(255, 255, 153, 0),
-                    ),
-                  ),
+        Image.network(
+          imagePath,
+          height: 450,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              height: 450,
+              color: Colors.grey[900],
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Color.fromARGB(255, 255, 153, 0),
                 ),
-                errorWidget: (context, url, error) => Container(
-                  height: 450,
-                  color: Colors.grey[900],
-                  child: const Center(
-                    child: Icon(
-                      Icons.broken_image,
-                      color: Colors.white,
-                      size: 50,
-                    ),
-                  ),
-                ),
-              )
-            : Image.asset(
-                data['image'],
-                height: 450,
-                width: double.infinity,
-                fit: BoxFit.cover,
               ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 450,
+              color: Colors.grey[900],
+              child: const Center(
+                child: Icon(
+                  Icons.broken_image,
+                  color: Colors.white,
+                  size: 50,
+                ),
+              ),
+            );
+          },
+        ),
         Container(
           height: 450,
           decoration: BoxDecoration(
