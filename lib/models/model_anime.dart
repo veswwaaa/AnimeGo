@@ -1,7 +1,7 @@
 
 class DataAnim {
   final String title;
-  final String japaneseTitle;
+  final String? japaneseTitle;
   final String synopsis;
   final String imageUrl;
   final String score;
@@ -11,7 +11,7 @@ class DataAnim {
 
   DataAnim({
     required this.title,
-    required this.japaneseTitle,
+    this.japaneseTitle,
     required this.synopsis,
     required this.imageUrl,
     required this.score,

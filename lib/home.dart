@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'api_sevice.dart';
 import 'widgets/card.dart';
 import 'models/model_anime.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -19,17 +21,19 @@ class _MyHomePageState extends State<Homepage>
   bool _isLoading = true;
 
   List<Map<String, dynamic>> _banners = [];
+  List<DataAnim> _latestAnime = [];
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  double _currentPageValue = 0.0;
 
   bool _showContent = true;
 
   @override
   void initState() {
     super.initState();
+
+    initializeLatestAnime();
 
     _animationController = AnimationController(
       vsync: this,
@@ -45,16 +49,18 @@ class _MyHomePageState extends State<Homepage>
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
         );
 
-    _pageController.addListener(() {
-      if (!mounted) return;
-      final page = _pageController.page;
-      if (page == null || page.isNaN || page.isInfinite) return; // <-- validasi
-      setState(() {
-        _currentPageValue = page;
-      });
-    });
-
     _loadDataFromApi();
+  }
+
+  void initializeLatestAnime() async {
+    try {
+      final latestAnime = await getLatestAnime();
+      setState(() {
+        _latestAnime = latestAnime;
+      });
+    } catch (e) {
+      print('Error initializing latest anime: $e');
+    }
   }
 
   @override
@@ -107,7 +113,6 @@ class _MyHomePageState extends State<Homepage>
         return;
       }
 
-      // sembunyikan content dulu
       setState(() {
         _showContent = false;
       });
@@ -130,20 +135,8 @@ class _MyHomePageState extends State<Homepage>
         });
         _animationController.reset();
         _animationController.forward();
-
-        // tunggu slide selesai baru tampilkan content + play animasi
-        // Future.delayed(const Duration(milliseconds: 600), () {
-        //   if (!mounted) return;
-        //   setState(() {
-        //     _showContent = true;
-        //   });
-        //   _animationController.reset();
-        //   _animationController.forward();
-        // });
       }
     });
-
-    // _animationController.forward();
   }
 
   @override
@@ -171,45 +164,49 @@ class _MyHomePageState extends State<Homepage>
                         height: 420,
                         child: Stack(
                           children: [
-                            PageView.builder(
-                              controller: _pageController,
-                              onPageChanged: (index) {
-                                setState(() {
-                                  _currentPage = index;
-                                });
-                                // _animationController.reset();
-                                // _animationController.forward();
-                              },
-                              itemCount: _banners.length,
-                              itemBuilder: (context, index) {
-                                double distance = 0.0;
-                                double darkness = 0.0;
+                            AnimatedBuilder(
+                              animation: _pageController,
+                              builder: (context, child) {
+                                final pageValue =
+                                    _pageController.hasClients &&
+                                        _pageController.position.haveDimensions
+                                    ? (_pageController.page ??
+                                          _currentPage.toDouble())
+                                    : _currentPage.toDouble();
 
-                                if (!_currentPageValue.isNaN &&
-                                    !_currentPageValue.isInfinite) {
-                                  distance = (_currentPageValue - index).abs();
-                                  darkness = distance.clamp(0.0, 1.0);
-                                }
+                                return PageView.builder(
+                                  controller: _pageController,
+                                  onPageChanged: (index) {
+                                    setState(() {
+                                      _currentPage = index;
+                                    });
+                                  },
+                                  itemCount: _banners.length,
+                                  itemBuilder: (context, index) {
+                                    final distance =
+                                        (pageValue - index).abs();
+                                    final darkness = distance.clamp(0.0, 1.0);
 
-                                // content hanya muncul di banner aktif dan saat _showContent true
-                                bool isActiveBanner =
-                                    index == _currentPage && _showContent;
+                                    final isActiveBanner =
+                                        index == _currentPage && _showContent;
 
-                                return Stack(
-                                  children: [
-                                    _buildBanner(
-                                      _banners[index],
-                                      showContent: isActiveBanner,
-                                    ),
-
-                                    Positioned.fill(
-                                      child: Container(
-                                        color: Colors.black.withOpacity(
-                                          darkness,
+                                    return Stack(
+                                      children: [
+                                        _buildBanner(
+                                          _banners[index],
+                                          showContent: isActiveBanner,
                                         ),
-                                      ),
-                                    ),
-                                  ],
+
+                                        Positioned.fill(
+                                          child: Container(
+                                            color: Colors.black.withOpacity(
+                                              darkness,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 );
                               },
                             ),
@@ -239,7 +236,6 @@ class _MyHomePageState extends State<Homepage>
                                           horizontal: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          // shape: BoxShape.circle,
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
@@ -281,21 +277,10 @@ class _MyHomePageState extends State<Homepage>
                                     crossAxisSpacing: 8,
                                   ),
 
-                              itemCount: 3,
+                              itemCount: _latestAnime.length,
                               itemBuilder: (context, index) {
-                                final data = _banners[index];
-                                final anime = DataAnim(
-                                  title: data['title'],
-                                  japaneseTitle: data['japaneseTitle'],
-                                  synopsis: data['synopsis'],
-                                  imageUrl: data['image'],
-                                  score: (data['score'] ?? 0).toDouble(),
-                                  genres: List<String>.from(
-                                    data['genre'].toList(),
-                                  ).join(', '),
-                                  sourceUrl: data['sourceUrl'] ?? '',
-                                );
-                                return AnimCard(anime: anime);
+                                final data = _latestAnime[index];
+                                return AnimCard(anime: data);
                               },
                             ),
                           ],
@@ -304,21 +289,12 @@ class _MyHomePageState extends State<Homepage>
                     ],
                   ),
                 ),
-
-                //dot
               ],
             ),
     );
   }
 
-  //content
   Widget _buildBanner(Map<String, dynamic> data, {bool showContent = true}) {
-    // validasi ketat
-    // double safeOpacity = 1.0;
-    // if (!showContent.isNaN && !showContent.isInfinite) {
-    //   safeOpacity = showContent.clamp(0.0, 1.0);
-    // }
-
     final imagePath = ((data['image'] as String?) ?? '').trim();
 
     return Stack(
@@ -361,21 +337,6 @@ class _MyHomePageState extends State<Homepage>
             ),
           ),
         ),
-        // Container(
-        //   height: 450,
-        //   decoration: BoxDecoration(
-        //     gradient: LinearGradient(
-        //       begin: Alignment.bottomCenter,
-        //       end: Alignment.topCenter,
-        //       colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-        //     ),
-        //   ),
-        // ),
-
-        // Container(
-        //   height: 450,
-        //   color: Colors.black.withOpacity(_pageFraction * 0.85),
-        // ),
         if (showContent)
           Positioned(
             bottom: 70,
@@ -398,7 +359,6 @@ class _MyHomePageState extends State<Homepage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      //genre
                       Wrap(
                         spacing: 8,
                         children: data['genre'].map<Widget>((genre) {
@@ -500,5 +460,33 @@ class _MyHomePageState extends State<Homepage>
           ),
       ],
     );
+  }
+}
+
+Future<List<DataAnim>> getLatestAnime() async {
+  print('Fetching latest anime from API...');
+  try {
+    final response = await http.get(
+      Uri.parse('https://kevinapienim.vercel.app/api/nimegami/schedules'),
+    );
+    print('API Response Status: ${response.statusCode}');
+
+    final decodedJson = jsonDecode(response.body);
+    print('Decoded JSON Keys: ${decodedJson.keys}');
+    final apiData = decodedJson['animeUpdates'] as List<dynamic>;
+
+    List<DataAnim> latestAnime = apiData.map((data) => DataAnim(
+      title: data['title'],
+      synopsis: data['synopsis'],
+      imageUrl: data['images']['jpg']['large_image_url'],
+      score: data['score'].toString(),
+      genres: data['genres'].toString(),
+      sourceUrl: data['sourceUrl']
+    )).toList();
+
+    return latestAnime;
+  } catch (e) {
+    print('Error fetching latest anime: $e');
+    return [DataAnim(title: 'Error', japaneseTitle: '', synopsis: '', imageUrl: '', score: '0.0', genres: '', sourceUrl: '')];
   }
 }
