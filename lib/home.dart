@@ -125,7 +125,7 @@ class _MyHomePageState extends State<Homepage>
           curve: Curves.easeInOut,
         );
 
-        setState((){
+        setState(() {
           _showContent = true;
         });
         _animationController.reset();
@@ -169,88 +169,143 @@ class _MyHomePageState extends State<Homepage>
                     children: [
                       SizedBox(
                         height: 420,
-                        child: PageView.builder(
-                          controller: _pageController,
-                          onPageChanged: (index) {
-                            setState(() {
-                              _currentPage = index;
-                            });
-                            // _animationController.reset();
-                            // _animationController.forward();
-                          },
-                          itemCount: _banners.length,
-                          itemBuilder: (context, index) {
-                            double distance = 0.0;
-                            double darkness = 0.0;
+                        child: Stack(
+                          children: [
+                            PageView.builder(
+                              controller: _pageController,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentPage = index;
+                                });
+                                // _animationController.reset();
+                                // _animationController.forward();
+                              },
+                              itemCount: _banners.length,
+                              itemBuilder: (context, index) {
+                                double distance = 0.0;
+                                double darkness = 0.0;
 
-                            if (!_currentPageValue.isNaN &&
-                                !_currentPageValue.isInfinite) {
-                              distance = (_currentPageValue - index).abs();
-                              darkness = distance.clamp(0.0, 1.0);
-                            }
+                                if (!_currentPageValue.isNaN &&
+                                    !_currentPageValue.isInfinite) {
+                                  distance = (_currentPageValue - index).abs();
+                                  darkness = distance.clamp(0.0, 1.0);
+                                }
 
-                            // content hanya muncul di banner aktif dan saat _showContent true
-                            bool isActiveBanner =
-                                index == _currentPage && _showContent;
+                                // content hanya muncul di banner aktif dan saat _showContent true
+                                bool isActiveBanner =
+                                    index == _currentPage && _showContent;
 
-                            return Stack(
-                              children: [
-                                _buildBanner(
-                                  _banners[index],
-                                  showContent: isActiveBanner,
-                                ),
+                                return Stack(
+                                  children: [
+                                    _buildBanner(
+                                      _banners[index],
+                                      showContent: isActiveBanner,
+                                    ),
 
-                                Positioned.fill(
-                                  child: Container(
-                                    color: Colors.black.withOpacity(darkness),
+                                    Positioned.fill(
+                                      child: Container(
+                                        color: Colors.black.withOpacity(
+                                          darkness,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            Positioned(
+                              bottom: 26,
+                              left: 20,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 15),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: List.generate(
+                                    _banners.length,
+                                    (index) => GestureDetector(
+                                      onTap: () =>
+                                          _pageController.animateToPage(
+                                            index,
+                                            duration: Duration(
+                                              milliseconds: 800,
+                                            ),
+                                            curve: Curves.easeInOut,
+                                          ),
+                                      child: AnimatedContainer(
+                                        duration: Duration(milliseconds: 300),
+                                        width: _currentPage == index ? 30 : 8,
+                                        height: 8,
+                                        margin: EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          // shape: BoxShape.circle,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          color: _currentPage == index
+                                              ? Color.fromARGB(255, 255, 153, 0)
+                                              : Colors.white,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Latest Relases',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    childAspectRatio: 0.65,
+                                    mainAxisSpacing: 8,
+                                    crossAxisSpacing: 8,
+                                  ),
 
-                                Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                )
-                              ],
-                            );
-                          },
+                              itemCount: 3,
+                              itemBuilder: (context, index) {
+                                final data = _banners[index];
+                                final anime = DataAnim(
+                                  title: data['title'],
+                                  japaneseTitle: data['japaneseTitle'],
+                                  synopsis: data['synopsis'],
+                                  imageUrl: data['image'],
+                                  score: (data['score'] ?? 0).toDouble(),
+                                  genres: List<String>.from(
+                                    data['genre'].toList(),
+                                  ).join(', '),
+                                  sourceUrl: data['sourceUrl'] ?? '',
+                                );
+                                return AnimCard(anime: anime);
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
+
                 //dot
-                Positioned(
-                  bottom: 26,
-                  left: 20,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 15),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(
-                        _banners.length,
-                        (index) => GestureDetector(
-                          onTap: () => _pageController.animateToPage(
-                            index,
-                            duration: Duration(milliseconds: 800),
-                            curve: Curves.easeInOut,
-                          ),
-                          child: AnimatedContainer(
-                            duration: Duration(milliseconds: 300),
-                            width: _currentPage == index ? 30 : 8,
-                            height: 8,
-                            margin: EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              // shape: BoxShape.circle,
-                              borderRadius: BorderRadius.circular(8),
-                              color: _currentPage == index
-                                  ? Color.fromARGB(255, 255, 153, 0)
-                                  : Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
     );
@@ -291,11 +346,7 @@ class _MyHomePageState extends State<Homepage>
               height: 450,
               color: Colors.grey[900],
               child: const Center(
-                child: Icon(
-                  Icons.broken_image,
-                  color: Colors.white,
-                  size: 50,
-                ),
+                child: Icon(Icons.broken_image, color: Colors.white, size: 50),
               ),
             );
           },
