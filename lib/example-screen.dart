@@ -49,8 +49,9 @@ class Anime {
   final double rating;
   final List<String> genres;
   final String synopsis;
-  final String sourceUrl;
-  final int episodes;
+  String sourceUrl;
+  String? detailUrl;
+  int episodes;
 
   Anime({
     required this.title,
@@ -58,6 +59,7 @@ class Anime {
     required this.rating,
     required this.genres,
     required this.sourceUrl,
+    this.detailUrl,
     required this.episodes,
     this.synopsis =
         "Yuji Itadori is a boy with tremendous physical strength, though he lives a completely ordinary high school life. One day, to save a friend who has been attacked by Curses, he eats a finger of Ryomen Sukuna, taking the Curse into his own soul.",
@@ -246,7 +248,10 @@ String _fallbackImageForTitle(String title) {
   return 'https://picsum.photos/seed/${Uri.encodeComponent(title)}/400/600';
 }
 
-String _normalizeAnimeImageUrl(String? rawUrl, {required String fallbackTitle}) {
+String _normalizeAnimeImageUrl(
+  String? rawUrl, {
+  required String fallbackTitle,
+}) {
   final value = rawUrl?.trim() ?? '';
   if (value.isEmpty) {
     return _fallbackImageForTitle(fallbackTitle);
@@ -322,10 +327,7 @@ Widget buildSafeAnimeImage(
       height: height,
       color: const Color(0xFF1C1C24),
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.image_not_supported_outlined,
-        color: Colors.grey,
-      ),
+      child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
     ),
   );
 }
@@ -1096,9 +1098,9 @@ class ProfileScreen extends StatelessWidget {
 // 5. DETAIL SCREEN
 // ==========================================
 class AnimeDetailScreen extends StatefulWidget {
-  final Anime anime;
+  Anime anime;
 
-  const AnimeDetailScreen({super.key, required this.anime});
+  AnimeDetailScreen({super.key, required this.anime});
 
   @override
   State<AnimeDetailScreen> createState() => _AnimeDetailScreenState();
@@ -1106,18 +1108,38 @@ class AnimeDetailScreen extends StatefulWidget {
 
 class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   late Anime _anime;
+  late final Anime _initialAnime;
+  int serverId = 1;
   bool _isRefreshingDetail = false;
+
+  Anime _cloneAnime(Anime source) {
+    return Anime(
+      title: source.title,
+      imageUrl: source.imageUrl,
+      rating: source.rating,
+      genres: List<String>.from(source.genres),
+      synopsis: source.synopsis,
+      sourceUrl: source.sourceUrl,
+      detailUrl: source.detailUrl,
+      episodes: source.episodes,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _anime = widget.anime;
+    _anime = _cloneAnime(widget.anime);
+    _initialAnime = _cloneAnime(widget.anime);
     _refreshAnimeDetail();
   }
 
-  Future<void> _refreshAnimeDetail() async {
-    final sourceUrl = _anime.sourceUrl.trim();
-    if (sourceUrl.isEmpty) {
+  Future<void> _refreshAnimeDetail({
+    String? sourceUrl,
+    int? serverOverride,
+  }) async {
+    final activeServer = serverOverride ?? serverId;
+    final targetSourceUrl = (sourceUrl ?? _anime.sourceUrl).trim();
+    if (targetSourceUrl.isEmpty) {
       return;
     }
 
@@ -1126,13 +1148,17 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     });
 
     try {
-      final latestAnime = await detailAnime(sourceUrl);
+      final latestAnime = await detailAnime(
+        targetSourceUrl,
+        serverId: activeServer,
+      );
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _anime = latestAnime;
+        _anime.sourceUrl = latestAnime.sourceUrl;
+        _anime.episodes = latestAnime.episodes;
       });
     } catch (error, stackTrace) {
       _logError(
@@ -1146,6 +1172,61 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           _isRefreshingDetail = false;
         });
       }
+    }
+  }
+
+  Future<void> _changeServer(int targetServerId) async {
+    print('Pindah ke server $targetServerId');
+    if (targetServerId == serverId) {
+      return;
+    }
+
+    setState(() {
+      serverId = targetServerId;
+    });
+
+    if (targetServerId == 1) {
+      print('Kembali ke server 1 dengan URL: ${_initialAnime.sourceUrl}');
+      await _refreshAnimeDetail(
+        sourceUrl: _initialAnime.sourceUrl,
+        serverOverride: 1,
+      );
+      return;
+    }
+
+    try {
+      final candidates = await searchAnime(_anime.title, serverId: 2);
+      if (!mounted) {
+        return;
+      }
+
+      if (candidates.isEmpty) {
+        _showErrorSnackBar(context, 'Anime tidak ditemukan di Server 2.');
+        return;
+      }
+
+      final selectedAnime = candidates.first;
+      print(selectedAnime.title);
+      print(selectedAnime.detailUrl);
+      setState(() {
+        _anime.sourceUrl = selectedAnime.sourceUrl;
+        _anime.episodes = selectedAnime.episodes;
+      });
+
+      await _refreshAnimeDetail(
+        sourceUrl: selectedAnime.detailUrl,
+        serverOverride: 2,
+      );
+    } catch (error, stackTrace) {
+      _logError(
+        'Gagal pindah ke server 2 untuk anime: ${_anime.title}',
+        error,
+        stackTrace,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar(context, 'Gagal memuat data dari Server 2.');
     }
   }
 
@@ -1277,6 +1358,92 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                     style: const TextStyle(color: Colors.grey, height: 1.5),
                   ),
                   const SizedBox(height: 24),
+                  const Text(
+                    'Select Server',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _changeServer(1),
+                          child: Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: serverId == 1
+                                  ? const Color(0xFFFF7A00)
+                                  : const Color(0xFF1C1C24),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Server 1',
+                                  style: TextStyle(
+                                    color: serverId == 1
+                                        ? Colors.white
+                                        : Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '2 eps',
+                                  style: TextStyle(
+                                    color: serverId == 1
+                                        ? Colors.white
+                                        : Colors.orangeAccent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _changeServer(2),
+                          child: Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: serverId == 2
+                                  ? const Color(0xFFFF7A00)
+                                  : const Color(0xFF1C1C24),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Server 2',
+                                  style: TextStyle(
+                                    color: serverId == 2
+                                        ? Colors.white
+                                        : Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '12 eps',
+                                  style: TextStyle(
+                                    color: serverId == 2
+                                        ? Colors.white
+                                        : Colors.orangeAccent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   Text(
                     'Episodes ($episodeCount)',
                     style: const TextStyle(
@@ -1319,6 +1486,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                             final episodeUrl = await animeEpisode(
                               sourceUrl,
                               index + 1,
+                              serverId,
                             );
                             if (!context.mounted) {
                               return;
@@ -1424,7 +1592,23 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    final parsedUri = Uri.tryParse(widget.videoUrl);
+    _player = Player();
+    _videoController = VideoController(_player);
+    _durationSubscription = _player.stream.duration.listen(
+      _seekToInitialPositionWhenReady,
+    );
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    // final hlsUrl = await getOdvidhideUrl("unx9ahyh9hzr");
+    // print("URL HLS: $hlsUrl");
+
+    // final targetUrl = (hlsUrl?.trim().isNotEmpty ?? false)
+    //     ? hlsUrl!
+    //     : widget.videoUrl;
+    final targetUrl = widget.videoUrl;
+    final parsedUri = Uri.tryParse(targetUrl);
     final fallbackUri = Uri.parse(
       'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
     );
@@ -1437,17 +1621,15 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
 
     if (videoUri == fallbackUri) {
       _logInfo(
-        'Video URL tidak valid, gunakan fallback video. Input: ${widget.videoUrl}',
+        'Video URL tidak valid, gunakan fallback video. Input: $targetUrl',
       );
     }
 
-    _player = Player();
-    _videoController = VideoController(_player);
-    _player.open(Media(videoUri.toString()), play: true);
+    if (!mounted) {
+      return;
+    }
 
-    _durationSubscription = _player.stream.duration.listen(
-      _seekToInitialPositionWhenReady,
-    );
+    _player.open(Media(videoUri.toString()), play: true);
   }
 
   void _seekToInitialPositionWhenReady(Duration totalDuration) {
@@ -1465,9 +1647,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       return;
     }
 
-    final safeTarget = (target > totalDuration)
-        ? totalDuration
-        : target;
+    final safeTarget = (target > totalDuration) ? totalDuration : target;
     _player.seek(safeTarget);
   }
 
@@ -1549,123 +1729,266 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   }
 }
 
-Future<List<Anime>> searchAnime(String query) async {
+Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
+  final trimmedQuery = query.trim();
+  if (trimmedQuery.isEmpty) {
+    return [];
+  }
+
   late final http.Response response;
 
-  try {
-    response = await _httpGetWithRetry(
-      Uri.parse(
-        '$apiBaseUrl/api/nimegami/search?q=${Uri.encodeQueryComponent(query)}',
-      ),
-      timeout: const Duration(seconds: 45),
-      maxAttempts: 2,
-    );
-  } on TimeoutException catch (error, stackTrace) {
-    _logError('searchAnime timeout untuk query "$query"', error, stackTrace);
-    rethrow;
-  } catch (error, stackTrace) {
-    _logError(
-      'searchAnime request gagal untuk query "$query"',
-      error,
-      stackTrace,
-    );
-    rethrow;
+  switch (serverId) {
+    case 1:
+      try {
+        response = await _httpGetWithRetry(
+          Uri.parse(
+            '$apiBaseUrl/api/nimegami/search?q=${Uri.encodeQueryComponent(trimmedQuery)}',
+          ),
+          timeout: const Duration(seconds: 45),
+          maxAttempts: 2,
+        );
+      } on TimeoutException catch (error, stackTrace) {
+        _logError(
+          'searchAnime timeout untuk query "$query"',
+          error,
+          stackTrace,
+        );
+        rethrow;
+      } catch (error, stackTrace) {
+        _logError(
+          'searchAnime request gagal untuk query "$query"',
+          error,
+          stackTrace,
+        );
+        rethrow;
+      }
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Search API gagal dengan status ${response.statusCode}',
+        );
+      }
+
+      late final dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (error, stackTrace) {
+        _logError('searchAnime gagal parse response JSON', error, stackTrace);
+        rethrow;
+      }
+
+      if (decoded is! List) {
+        throw Exception('Invalid response format');
+      }
+
+      final animeFutures = decoded.whereType<Map<String, dynamic>>().map((
+        item,
+      ) {
+        final animeUrl = item['url']?.toString().trim() ?? '';
+        if (animeUrl.isEmpty) {
+          return Future<Anime?>.value(null);
+        }
+
+        return detailAnime(
+          animeUrl,
+          serverId: 1,
+        ).then<Anime?>((value) => value).catchError((error, stackTrace) {
+          _logError(
+            'searchAnime skip item gagal detail url: $animeUrl',
+            error,
+            stackTrace,
+          );
+          return null;
+        });
+      });
+
+      final animeList = await Future.wait(animeFutures);
+      return animeList.whereType<Anime>().toList();
+    case 2:
+      final normalizedQuery = _normalizeZoronimeSearchQuery(trimmedQuery);
+      try {
+        response = await _httpGetWithRetry(
+          Uri.parse(
+            '$apiBaseUrl/api/zoronime/search?q=${Uri.encodeQueryComponent(normalizedQuery)}',
+          ),
+          timeout: const Duration(seconds: 45),
+          maxAttempts: 2,
+        );
+      } catch (error, stackTrace) {
+        _logError(
+          'searchAnime(zoronime) request gagal untuk query "$normalizedQuery"',
+          error,
+          stackTrace,
+        );
+        rethrow;
+      }
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Search API zoronime gagal dengan status ${response.statusCode}',
+        );
+      }
+
+      late final dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (error, stackTrace) {
+        _logError(
+          'searchAnime(zoronime) gagal parse response JSON',
+          error,
+          stackTrace,
+        );
+        rethrow;
+      }
+
+      if (decoded is! List) {
+        throw const FormatException(
+          'searchAnime(zoronime) response bukan list',
+        );
+      }
+
+      final animeFutures = decoded.whereType<Map<String, dynamic>>().map((
+        item,
+      ) {
+        final animeUrl =
+            item['sourceUrl']?.toString().trim() ??
+            item['url']?.toString().trim() ??
+            '';
+
+        final fallbackTitle =
+            item['title']?.toString().trim() ?? 'Untitled Anime';
+        final fallbackAnime = Anime(
+          title: fallbackTitle.isEmpty ? 'Untitled Anime' : fallbackTitle,
+          imageUrl: _normalizeAnimeImageUrl(
+            item['imageUrl']?.toString(),
+            fallbackTitle: fallbackTitle,
+          ),
+          rating: (item['rating'] is num)
+              ? (item['rating'] as num).toDouble()
+              : double.tryParse('${item['rating']}') ?? 0.0,
+          genres: _parseGenres(item['genres']),
+          synopsis: (item['synopsis']?.toString().trim().isEmpty ?? true)
+              ? 'No synopsis available'
+              : item['synopsis'].toString().trim(),
+          sourceUrl: animeUrl,
+          episodes: _parseEpisodeCount(item['episodes']),
+        );
+
+        if (animeUrl.isEmpty) {
+          return Future<Anime?>.value(fallbackAnime);
+        }
+
+        return detailAnime(
+          animeUrl,
+          serverId: 2,
+        ).then<Anime?>((value) => value).catchError((error, stackTrace) {
+          _logError(
+            'searchAnime(zoronime) fallback item url: $animeUrl',
+            error,
+            stackTrace,
+          );
+          return fallbackAnime;
+        });
+      });
+
+      final animeList = await Future.wait(animeFutures);
+      return animeList.whereType<Anime>().toList();
   }
-
-  if (response.statusCode != 200) {
-    throw Exception('Search API gagal dengan status ${response.statusCode}');
-  }
-
-  late final dynamic decoded;
-  try {
-    decoded = jsonDecode(response.body);
-  } catch (error, stackTrace) {
-    _logError('searchAnime gagal parse response JSON', error, stackTrace);
-    rethrow;
-  }
-
-  if (decoded is! List) {
-    throw Exception('Invalid response format');
-  }
-
-  final animeFutures = decoded.whereType<Map<String, dynamic>>().map((item) {
-    final animeUrl = item['url']?.toString().trim() ?? '';
-    print(item);
-    if (animeUrl.isEmpty) {
-      return Future<Anime?>.value(null);
-    }
-
-    return detailAnime(animeUrl).then<Anime?>((value) => value).catchError((
-      error,
-      stackTrace,
-    ) {
-      _logError('searchAnime skip item gagal detail url: $animeUrl', error, stackTrace);
-      return null;
-    });
-  });
-
-  final animeList = await Future.wait(animeFutures);
-  return animeList.whereType<Anime>().toList();
+  return [];
 }
 
-Future<String?> animeEpisode(String rawUrl, int eps) async {
-  try {
-    final String encodedUrl = base64Encode(utf8.encode(rawUrl));
-    final String apiUrl =
-        '$apiBaseUrl/api/nimegami/media?url=$encodedUrl&eps=$eps';
+Future<String?> animeEpisode(String rawUrl, int eps, int server) async {
+  Future<String?> fetchEpisodeFrom(String endpoint) async {
+    try {
+      final trimmedUrl = rawUrl.trim();
+      if (trimmedUrl.isEmpty) {
+        return null;
+      }
 
-    _logInfo('Requesting episode: $apiUrl');
+      final String encodedUrl = (server == 2)
+          ? Uri.encodeQueryComponent(trimmedUrl)
+          : base64Encode(utf8.encode(trimmedUrl));
+      final String apiUrl = '$apiBaseUrl$endpoint?url=$encodedUrl&eps=$eps';
 
-    final response = await _httpGetWithRetry(
-      Uri.parse(apiUrl),
-      timeout: const Duration(seconds: 60),
-      maxAttempts: 2,
-    );
+      _logInfo('Requesting episode: $apiUrl');
 
-    if (response.statusCode == 200) {
+      final response = await _httpGetWithRetry(
+        Uri.parse(apiUrl),
+        timeout: const Duration(seconds: 60),
+        maxAttempts: 2,
+      );
+
+      print("Response status: ${response.body}");
+
+      if (response.statusCode != 200) {
+        _logInfo(
+          'Error Log: Server error episode dengan status ${response.statusCode}',
+        );
+        return null;
+      }
+
       final dynamic decodedDynamic = jsonDecode(response.body);
+
+      if (decodedDynamic is String && decodedDynamic.trim().isNotEmpty) {
+        return decodedDynamic.trim();
+      }
+
       if (decodedDynamic is! Map<String, dynamic>) {
-        _logInfo(
-          'Error Log: Format response episode tidak valid (bukan object).',
-        );
+        _logInfo('Error Log: Format response episode tidak valid.');
         return null;
       }
 
-      // final urlEps = decodedDynamic['url'];
-      // if (urlEps is! Map<String, dynamic>) {
-      //   _logInfo('Error Log: key "url" tidak ditemukan atau bukan object.');
-      //   return null;
-      // }
+      final directUrl = (server == 2)
+        ? (await getOdvidhideUrl(decodedDynamic['url']))?.trim() ?? '' :
+          decodedDynamic['url']?.toString().trim() ??
+          decodedDynamic['videoUrl']?.toString().trim() ??
+          decodedDynamic['streamUrl']?.toString().trim() ??
+          '';
+      
+      print(directUrl);
 
-      final bool isOk = decodedDynamic['ok'] == true;
-      final String videoUrl = (decodedDynamic['url'] ?? '').toString().trim();
-
-      if (isOk && videoUrl.isNotEmpty) {
-        _logInfo('Success episode url: $videoUrl');
-        return videoUrl;
-      } else {
-        _logInfo(
-          'Error Log: API episode mengembalikan data tidak valid atau "ok" false.',
-        );
-        return null;
+      if (directUrl.isNotEmpty) {
+        return directUrl;
       }
-    } else {
-      _logInfo(
-        'Error Log: Server error episode dengan status ${response.statusCode}',
+
+      final data = decodedDynamic['data'];
+      if (data is Map<String, dynamic>) {
+        final nestedUrl = (server == 2)
+            ? (await getOdvidhideUrl(data['url']))?.trim() ?? ''
+            : data['url']?.toString().trim() ??
+              data['videoUrl']?.toString().trim() ??
+              data['streamUrl']?.toString().trim() ??
+              '';
+        print("Nested URL: $nestedUrl");
+        if (nestedUrl.isNotEmpty) {
+          return nestedUrl;
+        }
+      }
+
+      return null;
+    } catch (error, stackTrace) {
+      _logError(
+        'Error Log: Terjadi kesalahan fatal saat ambil episode',
+        error,
+        stackTrace,
       );
       return null;
     }
-  } catch (error, stackTrace) {
-    _logError(
-      'Error Log: Terjadi kesalahan fatal saat ambil episode',
-      error,
-      stackTrace,
-    );
-    return null;
+  }
+
+  switch (server) {
+    case 1:
+      return await fetchEpisodeFrom('/api/nimegami/media');
+    case 2:
+      return await fetchEpisodeFrom('/api/zoronime/media');
+    default:
+      _logInfo('server tidak dikenal: $server');
+      return null;
   }
 }
 
-Future<Anime> detailAnime(String url) async {
+Future<Anime> detailAnime(String url, {int serverId = 1}) async {
+  print('detailAnime called with url: $url, serverId: $serverId');
   final trimmedUrl = url.trim();
   if (trimmedUrl.isEmpty) {
     throw const FormatException('detailAnime url kosong');
@@ -1673,15 +1996,25 @@ Future<Anime> detailAnime(String url) async {
 
   _logInfo('detailAnime called with url: $trimmedUrl');
 
+  final endpoint = serverId == 2
+      ? '/api/zoronime/anime'
+      : '/api/nimegami/anime';
+
+  //jika serverid 1 itu pake tobase64, jika serverid 2 dia tidak pake tobase64
+  // final response = await _httpGetWithRetry(
+  //   Uri.parse('$apiBaseUrl$endpoint?url=${toBase64(trimmedUrl)}'),
+  //   timeout: const Duration(seconds: 45),
+  //   maxAttempts: 2,
+  // );
   final response = await _httpGetWithRetry(
     Uri.parse(
-      '$apiBaseUrl/api/nimegami/anime?url=${toBase64(trimmedUrl)}',
+      serverId == 2
+          ? '$apiBaseUrl$endpoint?url=${Uri.encodeQueryComponent(trimmedUrl)}'
+          : '$apiBaseUrl$endpoint?url=${toBase64(trimmedUrl)}',
     ),
     timeout: const Duration(seconds: 45),
     maxAttempts: 2,
   );
-  print(response.body);
-  print('$apiBaseUrl/api/nimegami/anime?url=${toBase64(trimmedUrl)}');
 
   if (response.statusCode != 200) {
     throw Exception('detailAnime gagal dengan status ${response.statusCode}');
@@ -1699,35 +2032,82 @@ Future<Anime> detailAnime(String url) async {
     throw const FormatException('detailAnime response bukan object');
   }
 
-  final dynamic nameDynamic = decoded['name'];
-  if (nameDynamic is! Map<String, dynamic>) {
-    throw const FormatException('detailAnime field "name" tidak valid');
-  }
+  final Map<String, dynamic> animePayload =
+      (decoded['name'] is Map<String, dynamic>)
+      ? decoded['name'] as Map<String, dynamic>
+      : decoded;
 
-  final rawTitle = nameDynamic['title']?.toString().trim() ?? '';
+  final rawTitle =
+      animePayload['title']?.toString().trim() ??
+      animePayload['name']?.toString().trim() ??
+      '';
   final safeTitle = rawTitle.isEmpty ? 'Untitled Anime' : rawTitle;
+  final fallbackImage = _normalizeAnimeImageUrl(
+    animePayload['imageUrl']?.toString(),
+    fallbackTitle: safeTitle,
+  );
+
+  final imageUrl = (animePayload['images'] is Map<String, dynamic>)
+      ? _extractBestImageUrl(animePayload['images'], fallbackTitle: safeTitle)
+      : fallbackImage;
 
   return Anime(
     title: safeTitle,
-    imageUrl: _extractBestImageUrl(
-      nameDynamic['images'],
-      fallbackTitle: safeTitle,
-    ),
-    rating: (nameDynamic['score'] is num)
-        ? (nameDynamic['score'] as num).toDouble()
-        : 0.0,
-    genres:
-        (nameDynamic['genres'] as List<dynamic>?)
-            ?.whereType<Map<String, dynamic>>()
-            .map((g) => g['name']?.toString() ?? 'Unknown')
-            .toList() ??
-        ['Unknown'],
-    synopsis: (nameDynamic['synopsis']?.toString().trim().isEmpty ?? true)
+    imageUrl: imageUrl,
+    rating: (animePayload['score'] is num)
+        ? (animePayload['score'] as num).toDouble()
+        : (animePayload['rating'] is num)
+        ? (animePayload['rating'] as num).toDouble()
+        : double.tryParse(
+                '${animePayload['score'] ?? animePayload['rating']}',
+              ) ??
+              0.0,
+    genres: _parseGenres(animePayload['genres']),
+    synopsis: (animePayload['synopsis']?.toString().trim().isEmpty ?? true)
         ? 'No synopsis available'
-        : nameDynamic['synopsis'].toString().trim(),
-    sourceUrl: trimmedUrl,
-    episodes: _parseEpisodeCount(nameDynamic['last_episode']),
+        : animePayload['synopsis'].toString().trim(),
+    sourceUrl: animePayload['sourceUrl']?.toString().trim().isNotEmpty == true
+        ? animePayload['sourceUrl'].toString().trim()
+        : trimmedUrl,
+    detailUrl: trimmedUrl,
+    episodes: _parseEpisodeCount(
+      animePayload['last_episode'] ?? animePayload['episodes'],
+    ),
   );
+}
+
+String _normalizeZoronimeSearchQuery(String input) {
+  return input
+      .toLowerCase()
+      // Remove only bracket characters, keep the text inside.
+      .replaceAll(RegExp(r'[\[\]\(\)\{\}]'), ' ')
+      // Convert ordinal suffixes: 3rd -> 3, 1st -> 1.
+      .replaceAllMapped(
+        RegExp(r'\b(\d+)(st|nd|rd|th)\b'),
+        (match) => match.group(1)!,
+      )
+      .replaceAll(RegExp(r'[-_]'), ' ')
+      .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+List<String> _parseGenres(dynamic rawGenres) {
+  if (rawGenres is! List) {
+    return ['Unknown'];
+  }
+
+  final genres = rawGenres
+      .map((genre) {
+        if (genre is Map<String, dynamic>) {
+          return genre['name']?.toString().trim() ?? '';
+        }
+        return genre?.toString().trim() ?? '';
+      })
+      .where((genre) => genre.isNotEmpty)
+      .toList();
+
+  return genres.isEmpty ? ['Unknown'] : genres;
 }
 
 void _logInfo(String message) {
@@ -1866,4 +2246,90 @@ int _parseEpisodeCount(dynamic value) {
     return int.tryParse(value.trim()) ?? 0;
   }
   return 0;
+}
+
+Future<String?> getOdvidhideUrl(String fileId) async {
+  final embedUrl = Uri.parse('https://odvidhide.com/embed/$fileId');
+
+  try {
+    // 1. Fetch HTML embed page
+    final response = await http.get(
+      embedUrl,
+      headers: {
+        "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://odvidhide.com/",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception("Gagal memuat halaman: HTTP ${response.statusCode}");
+    }
+
+    final html = response.body;
+
+    // 2. Cari packed script
+    final packerRegex = RegExp(r"eval\(function\(p,a,c,k,e,d\)[\s\S]+?\.split\('\|'\)\)\)");
+    final packerMatch = packerRegex.firstMatch(html);
+    if (packerMatch == null) throw Exception("Packed script tidak ditemukan");
+
+    final packedScript = packerMatch.group(0)!;
+
+    // Decode JavaScript Packer (p,a,c,k,e,d) secara inline
+    final decodeRegex = RegExp(r"}\s*\(\s*'([\s\S]*?)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([\s\S]*?)'\.split\(\s*'\|'\s*\)");
+    final decodeMatch = decodeRegex.firstMatch(packedScript);
+    if (decodeMatch == null) throw Exception("Tidak bisa parse packed script");
+
+    String p = decodeMatch.group(1)!;
+    final int a = int.parse(decodeMatch.group(2)!);
+    final int c = int.parse(decodeMatch.group(3)!);
+    final List<String> k = decodeMatch.group(4)!.split('|');
+
+    // Proses decoding
+    for (int i = c - 1; i >= 0; i--) {
+      // Sama seperti `if (k[i])` di JS
+      if (i < k.length && k[i].isNotEmpty) {
+        // toRadixString di Dart berfungsi persis seperti toString(radix) di JS (mendukung base 2-36)
+        final radixStr = i.toRadixString(a); 
+        p = p.replaceAll(RegExp(r'\b' + radixStr + r'\b'), k[i]);
+      }
+    }
+    
+    final decoded = p;
+
+    // 3. Cari object links/o yang berisi video sources
+    final objectRegex = RegExp(r"var\s+(?:links|o)\s*=\s*(\{[\s\S]*?\})\s*;");
+    final objectMatch = objectRegex.firstMatch(decoded);
+    if (objectMatch == null) throw Exception("Video sources tidak ditemukan");
+
+    final objectStr = objectMatch.group(1)!;
+
+    // 4. Ambil URL hls2
+    final hls2Regex = RegExp(r'''["']hls2["']\s*:\s*["']([^"']+)["']''');
+    final hls2Match = hls2Regex.firstMatch(objectStr);
+    if (hls2Match == null) throw Exception("URL hls2 tidak ditemukan");
+
+    final masterUrl = hls2Match.group(1)!;
+
+    // 5. Convert master.m3u8 → index-v1-a1.m3u8
+    final queryStart = masterUrl.indexOf("?");
+    String basePath = masterUrl;
+    String queryString = "";
+
+    if (queryStart != -1) {
+      basePath = masterUrl.substring(0, queryStart);
+      queryString = masterUrl.substring(queryStart);
+    }
+
+    // Replace master.m3u8 di akhir path lalu gabungkan dengan query string
+    final indexUrl = basePath.replaceAll(RegExp(r'master\.m3u8$'), 'index-v1-a1.m3u8') + queryString;
+
+    return indexUrl;
+
+  } catch (e) {
+    // Print error untuk mempermudah debugging
+    print("Error saat mengekstrak URL: $e");
+    return null;
+  }
 }
