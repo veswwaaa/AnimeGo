@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'api_sevice.dart';
+import 'widgets/card.dart';
+import 'models/model_anime.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -197,11 +199,16 @@ class _MyHomePageState extends State<Homepage>
                                   _banners[index],
                                   showContent: isActiveBanner,
                                 ),
+
                                 Positioned.fill(
                                   child: Container(
                                     color: Colors.black.withOpacity(darkness),
                                   ),
                                 ),
+
+                                Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                )
                               ],
                             );
                           },
