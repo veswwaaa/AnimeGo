@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'api_sevice.dart';
+import 'services/api_sevice.dart';
 import 'widgets/card.dart';
 import 'models/model_anime.dart';
 
@@ -31,6 +31,7 @@ class _MyHomePageState extends State<Homepage>
   void initState() {
     super.initState();
 
+    
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -130,25 +131,14 @@ class _MyHomePageState extends State<Homepage>
         });
         _animationController.reset();
         _animationController.forward();
-
-        // tunggu slide selesai baru tampilkan content + play animasi
-        // Future.delayed(const Duration(milliseconds: 600), () {
-        //   if (!mounted) return;
-        //   setState(() {
-        //     _showContent = true;
-        //   });
-        //   _animationController.reset();
-        //   _animationController.forward();
-        // });
       }
     });
-
-    // _animationController.forward();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: _isLoading
           ? Center(
               child: CircularProgressIndicator(
@@ -256,47 +246,48 @@ class _MyHomePageState extends State<Homepage>
                           ],
                         ),
                       ),
+
+                      //Section Latest Relases
                       Padding(
-                        padding: const EdgeInsets.all(12.0),
+                        padding: const EdgeInsets.only(top: 10, left: 20, right: 20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
                               'Latest Relases',
                               style: TextStyle(
-                                color: Colors.black,
+                                color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    childAspectRatio: 0.65,
-                                    mainAxisSpacing: 8,
-                                    crossAxisSpacing: 8,
-                                  ),
-
-                              itemCount: 3,
-                              itemBuilder: (context, index) {
-                                final data = _banners[index];
-                                final anime = DataAnim(
-                                  title: data['title'],
-                                  japaneseTitle: data['japaneseTitle'],
-                                  synopsis: data['synopsis'],
-                                  imageUrl: data['image'],
-                                  score: (data['score'] ?? 0).toDouble(),
-                                  genres: List<String>.from(
-                                    data['genre'].toList(),
-                                  ).join(', '),
-                                  sourceUrl: data['sourceUrl'] ?? '',
-                                );
-                                return AnimCard(anime: anime);
-                              },
+                            const SizedBox(height: 10),
+                            SizedBox(height: 200,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: 4,
+                                itemBuilder: (context, index) {
+                                  final data = _banners[index];
+                                  final anime = DataAnim(
+                                    title: data['title'],
+                                    japaneseTitle: data['japaneseTitle'],
+                                    synopsis: data['synopsis'],
+                                    imageUrl: data['image'],
+                                    score: data['score'].toString(),
+                                    genres: List<String>.from(
+                                      data['genre'].toList(),
+                                    ).join(', '),
+                                    sourceUrl: data['sourceUrl'] ?? '',
+                                  );
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: SizedBox(
+                                      width: 120,
+                                      child: AnimCard(anime: anime),
+                                    )
+                                  );
+                                },
+                              ),
                             ),
                           ],
                         ),
@@ -304,8 +295,6 @@ class _MyHomePageState extends State<Homepage>
                     ],
                   ),
                 ),
-
-                //dot
               ],
             ),
     );
@@ -313,12 +302,6 @@ class _MyHomePageState extends State<Homepage>
 
   //content
   Widget _buildBanner(Map<String, dynamic> data, {bool showContent = true}) {
-    // validasi ketat
-    // double safeOpacity = 1.0;
-    // if (!showContent.isNaN && !showContent.isInfinite) {
-    //   safeOpacity = showContent.clamp(0.0, 1.0);
-    // }
-
     final imagePath = ((data['image'] as String?) ?? '').trim();
 
     return Stack(
@@ -357,25 +340,15 @@ class _MyHomePageState extends State<Homepage>
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+              colors: [
+                const Color.fromARGB(0, 238, 47, 47),
+                Colors.black.withOpacity(0.7),
+                Colors.black,
+                ],
+                stops: const [0.0, 0.5, 0.9],
             ),
           ),
         ),
-        // Container(
-        //   height: 450,
-        //   decoration: BoxDecoration(
-        //     gradient: LinearGradient(
-        //       begin: Alignment.bottomCenter,
-        //       end: Alignment.topCenter,
-        //       colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-        //     ),
-        //   ),
-        // ),
-
-        // Container(
-        //   height: 450,
-        //   color: Colors.black.withOpacity(_pageFraction * 0.85),
-        // ),
         if (showContent)
           Positioned(
             bottom: 70,

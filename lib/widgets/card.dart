@@ -59,6 +59,7 @@ class AnimCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
+                    //title nye
                     anime.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -77,6 +78,7 @@ class AnimCard extends StatelessWidget {
                         size: 14,
                       ),
                       const SizedBox(width: 4),
+                      //skornye
                       Text(
                         anime.score.toString(),
                         style: const TextStyle(
