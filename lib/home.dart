@@ -19,6 +19,7 @@ class _MyHomePageState extends State<Homepage>
   bool _isLoading = true;
 
   List<Map<String, dynamic>> _banners = [];
+  List<Map<String, dynamic>> _onggoingList = []; // tambah variable ini
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -67,29 +68,39 @@ class _MyHomePageState extends State<Homepage>
 
   Future<void> _loadDataFromApi() async {
     try {
-      final apiData = await ApiService.fetchData();
+      final apiData = await ApiService.fetchData(); // fetch 1x saja
 
       if (apiData.isNotEmpty) {
+        final List<Map<String, dynamic>> mappedData = apiData
+            .map<Map<String, dynamic>>((anime) {
+              final imageUrl =
+                  (anime['images']?['jpg']?['large_image_url'] as String?) ??
+                  '';
+              return {
+                'image': imageUrl,
+                'title': anime['title'] ?? '',
+                'japaneseTitle': anime['japanese_title'] ?? '',
+                'synopsis': anime['synopsis'] ?? '',
+                'genre': List<String>.from(anime['genres'] ?? []),
+                'score': anime['score'] ?? 0,
+                'sourceUrl': anime['sourceUrl'] ?? '',
+                'isFromApi': true,
+              };
+            })
+            .toList();
+
         setState(() {
-          for (var anime in apiData) {
-            final imageUrl =
-                (anime['images']?['jpg']?['large_image_url'] as String?) ?? '';
-            _banners.add({
-              'image': imageUrl,
-              'title': anime['title'],
-              'japaneseTitle': anime['japanese_title'],
-              'synopsis': anime['synopsis'],
-              'genre': List<String>.from(anime['genres']),
-              'score': anime['score'],
-              'sourceUrl': anime['sourceUrl'],
-              'isFromApi': true,
-            });
-          }
+          _banners = mappedData.take(4).toList(); // banner hanya 4
+          _onggoingList = mappedData; // ongoing semua data
           _isLoading = false;
         });
         _startAutoScroll();
+        _animationController.forward();
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
       }
-      ;
     } catch (e) {
       print('Error loading data: $e');
       setState(() {
@@ -246,14 +257,18 @@ class _MyHomePageState extends State<Homepage>
                         ),
                       ),
 
-                      //Section Latest Relases
+                      //Section ongoing
                       Padding(
-                        padding: const EdgeInsets.only(top: 10, left: 20, right: 20),
+                        padding: const EdgeInsets.only(
+                          top: 10,
+                          left: 20,
+                          right: 20,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Latest Relases',
+                              'Ongoing Anime',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -261,20 +276,21 @@ class _MyHomePageState extends State<Homepage>
                               ),
                             ),
                             const SizedBox(height: 10),
-                            SizedBox(height: 200,
+                            SizedBox(
+                              height: 200,
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
-                                itemCount: 4,
+                                itemCount: _onggoingList.length,
                                 itemBuilder: (context, index) {
-                                  final data = _banners[index];
+                                  final data = _onggoingList[index];
                                   final anime = DataAnim(
-                                    title: data['title'],
-                                    japaneseTitle: data['japaneseTitle'],
-                                    synopsis: data['synopsis'],
-                                    imageUrl: data['image'],
-                                    score: data['score'].toString(),
+                                    title: data['title'] ?? '',
+                                    japaneseTitle: data['japaneseTitle'] ?? '',
+                                    synopsis: data['synopsis'] ?? '',
+                                    imageUrl: data['image'] ?? '',
+                                    score: (data['score'] ?? 0).toString(),
                                     genres: List<String>.from(
-                                      data['genre'].toList(),
+                                      data['genre'] ?? [],
                                     ).join(', '),
                                     sourceUrl: data['sourceUrl'] ?? '',
                                   );
@@ -283,7 +299,7 @@ class _MyHomePageState extends State<Homepage>
                                     child: SizedBox(
                                       width: 120,
                                       child: AnimCard(anime: anime),
-                                    )
+                                    ),
                                   );
                                 },
                               ),
@@ -343,8 +359,8 @@ class _MyHomePageState extends State<Homepage>
                 const Color.fromARGB(0, 238, 47, 47),
                 Colors.black.withOpacity(0.7),
                 Colors.black,
-                ],
-                stops: const [0.0, 0.5, 0.9],
+              ],
+              stops: const [0.0, 0.5, 0.9],
             ),
           ),
         ),

@@ -23,12 +23,12 @@ class AnimCard extends StatelessWidget {
             Image.network(
               anime.imageUrl,
               width: double.infinity,
-              height: 160,
+              height: 200,
               fit: BoxFit.cover,
               webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
               errorBuilder: (_, __, ___) => Container(
                 width: double.infinity,
-                height: 160,
+                height: 200,
                 color: Colors.grey[900],
                 child: const Icon(
                   Icons.broken_image,
@@ -44,7 +44,12 @@ class AnimCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.7),
+                      Colors.black
+                    ],
+                    stops: const [0.0, 0.8, 2.0],
                   ),
                 ),
               ),
