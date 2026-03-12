@@ -31,7 +31,6 @@ class _MyHomePageState extends State<Homepage>
   void initState() {
     super.initState();
 
-    
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
