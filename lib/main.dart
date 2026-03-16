@@ -1,11 +1,17 @@
-import 'package:animego/example-screen.dart';
+// import 'package:animego/example-screen.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:animego/hls-player.dart';
+import './example-demo-apk/ani-stream-app.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+// import 'package:animego/hls-player.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  await Supabase.initialize(
+    url: "https://lcbvrokfqpaylclxhpqn.supabase.co",
+    anonKey: "sb_publishable_A3QTA86sUrkBFlrFC-LT5Q_iuKAUYqI",
+  );
   runApp(const MyApp());
 }
 
