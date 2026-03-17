@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'services/api_sevice.dart';
-import 'widgets/card.dart';
-import 'models/model_anime.dart';
+import 'package:animego/core/services/api_sevice.dart';
+import 'package:animego/core/widgets/card.dart';
+import 'package:animego/core/models/model_anime.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});

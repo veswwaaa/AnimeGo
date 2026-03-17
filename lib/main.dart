@@ -1,4 +1,4 @@
-import 'package:animego/home.dart';
+import 'package:animego/features/home-screen/presentation/home.dart';
 import 'package:flutter/material.dart';
 
 void main() {

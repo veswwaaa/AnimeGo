@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/model_anime.dart';
-import '../pages/anime_detail.dart';
+import '../../features/anime-detail/presentation/anime_detail.dart';
 
 class AnimCard extends StatelessWidget {
   final DataAnim anime;

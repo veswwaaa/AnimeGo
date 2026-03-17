@@ -1,4 +1,4 @@
-import 'package:animego/models/model_anime.dart';
+import 'package:animego/core/models/model_anime.dart';
 import 'package:flutter/material.dart';
 
 class AnimeDetailPage extends StatefulWidget {
