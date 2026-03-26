@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../../core/utils/utils.dart';
+import '../../../core/utils/google-blog-direct.dart';
 
 
 // ==========================================
@@ -75,7 +76,14 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       return;
     }
 
-    _player.open(Media(videoUri.toString()), play: true);
+    final playbackHeaders = await VideoScraperService.buildPlaybackHeaders(
+      videoUri.toString(),
+    );
+
+    _player.open(
+      Media(videoUri.toString(), httpHeaders: playbackHeaders),
+      play: true,
+    );
   }
 
   void _seekToInitialPositionWhenReady(Duration totalDuration) {

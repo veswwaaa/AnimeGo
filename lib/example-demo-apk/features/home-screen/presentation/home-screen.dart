@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: Colors.white,
                             ),
                             label: const Text(
-                              'Watch Now',
+                              'Watch Noww',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,

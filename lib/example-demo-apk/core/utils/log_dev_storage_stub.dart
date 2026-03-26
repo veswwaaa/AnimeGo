@@ -1,5 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'hive_bootstrap.dart';
+
 const String _devLogsBoxName = 'dev_logs_box';
 const String _devLogsKey = 'entries';
 Box<dynamic>? _devLogsBox;
@@ -24,6 +26,7 @@ class DevLogEntry {
 }
 
 Future<Box<dynamic>> _openDevLogsBox() async {
+  await ensureHiveInitialized();
   _devLogsBox ??= await Hive.openBox<dynamic>(_devLogsBoxName);
   return _devLogsBox!;
 }
