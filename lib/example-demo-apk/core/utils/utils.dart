@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:animego/example-demo-apk/core/utils/google-blog-direct.dart';
+import 'package:animego/example-demo-apk/features/anime-detail-screen/data/google-blog-direct.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -196,111 +196,6 @@ void clearWatchHistory() {
   _persistWatchHistory(const []);
 }
 
-String formatPlaybackPosition(Duration duration) {
-  final hours = duration.inHours;
-  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-  if (hours > 0) {
-    return '$hours:$minutes:$seconds';
-  }
-  return '$minutes:$seconds';
-}
-
-String formatHistoryDate(DateTime dateTime) {
-  final day = dateTime.day.toString().padLeft(2, '0');
-  final month = dateTime.month.toString().padLeft(2, '0');
-  final year = dateTime.year;
-  return '$day/$month/$year';
-}
-
-String _fallbackImageForTitle(String title) {
-  return 'https://picsum.photos/seed/${Uri.encodeComponent(title)}/400/600';
-}
-
-String _normalizeAnimeImageUrl(
-  String? rawUrl, {
-  required String fallbackTitle,
-}) {
-  final value = rawUrl?.trim() ?? '';
-  if (value.isEmpty) {
-    return _fallbackImageForTitle(fallbackTitle);
-  }
-
-  final parsed = Uri.tryParse(value);
-  if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
-    return _fallbackImageForTitle(fallbackTitle);
-  }
-
-  var normalized = parsed;
-  if (normalized.scheme == 'http') {
-    normalized = normalized.replace(scheme: 'https');
-  }
-
-  if (normalized.host == 'myanimelist.net' &&
-      normalized.pathSegments.isNotEmpty &&
-      normalized.pathSegments.first == 'images') {
-    normalized = normalized.replace(host: 'cdn.myanimelist.net');
-  }
-
-  return normalized.toString();
-}
-
-String _extractBestImageUrl(dynamic images, {required String fallbackTitle}) {
-  if (images is! Map<String, dynamic>) {
-    return _fallbackImageForTitle(fallbackTitle);
-  }
-
-  final webp = images['webp'];
-  if (webp is Map<String, dynamic>) {
-    final large = webp['large_image_url']?.toString();
-    if (large != null && large.trim().isNotEmpty) {
-      return _normalizeAnimeImageUrl(large, fallbackTitle: fallbackTitle);
-    }
-
-    final normal = webp['image_url']?.toString();
-    if (normal != null && normal.trim().isNotEmpty) {
-      return _normalizeAnimeImageUrl(normal, fallbackTitle: fallbackTitle);
-    }
-  }
-
-  final jpg = images['jpg'];
-  if (jpg is Map<String, dynamic>) {
-    final large = jpg['large_image_url']?.toString();
-    if (large != null && large.trim().isNotEmpty) {
-      return _normalizeAnimeImageUrl(large, fallbackTitle: fallbackTitle);
-    }
-
-    final normal = jpg['image_url']?.toString();
-    if (normal != null && normal.trim().isNotEmpty) {
-      return _normalizeAnimeImageUrl(normal, fallbackTitle: fallbackTitle);
-    }
-  }
-
-  return _fallbackImageForTitle(fallbackTitle);
-}
-
-Widget buildSafeAnimeImage(
-  String imageUrl, {
-  BoxFit fit = BoxFit.cover,
-  double? width,
-  double? height,
-}) {
-  return Image.network(
-    _normalizeAnimeImageUrl(imageUrl, fallbackTitle: 'unknown'),
-    width: width,
-    height: height,
-    fit: fit,
-    filterQuality: FilterQuality.medium,
-    errorBuilder: (_, __, ___) => Container(
-      width: width,
-      height: height,
-      color: const Color(0xFF1C1C24),
-      alignment: Alignment.center,
-      child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
-    ),
-  );
-}
-
 Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
   final trimmedQuery = query.trim();
   if (trimmedQuery.isEmpty) {
@@ -312,7 +207,7 @@ Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
   switch (serverId) {
     case 1:
       try {
-        response = await _httpGetWithRetry(
+        response = await httpGetWithRetry(
           Uri.parse(
             '$apiBaseUrl/api/nimegami/search?q=${Uri.encodeQueryComponent(trimmedQuery)}',
           ),
@@ -379,7 +274,7 @@ Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
     case 2:
       final normalizedQuery = _normalizeZoronimeSearchQuery(trimmedQuery);
       try {
-        response = await _httpGetWithRetry(
+        response = await httpGetWithRetry(
           Uri.parse(
             '$apiBaseUrl/api/zoronime/search?q=${Uri.encodeQueryComponent(normalizedQuery)}',
           ),
@@ -429,7 +324,7 @@ Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
             item['title']?.toString().trim() ?? 'Untitled Anime';
         final fallbackAnime = Anime(
           title: fallbackTitle.isEmpty ? 'Untitled Anime' : fallbackTitle,
-          imageUrl: _normalizeAnimeImageUrl(
+          imageUrl: normalizeAnimeImageUrl(
             item['imageUrl']?.toString(),
             fallbackTitle: fallbackTitle,
           ),
@@ -441,7 +336,7 @@ Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
               ? 'No synopsis available'
               : item['synopsis'].toString().trim(),
           sourceUrl: animeUrl,
-          episodes: _parseEpisodeCount(item['episodes']),
+          episodes: parseEpisodeCount(item['episodes']),
         );
 
         if (animeUrl.isEmpty) {
@@ -466,214 +361,6 @@ Future<List<Anime>> searchAnime(String query, {int serverId = 1}) async {
   return [];
 }
 
-Future<String?> animeEpisode(String rawUrl, int eps, int server) async {
-  switch (server) {
-    case 1:
-      return await _fetchEpisodeServer1(rawUrl: rawUrl, eps: eps);
-    case 2:
-      return await _fetchEpisodeServer2(rawUrl: rawUrl, eps: eps);
-    default:
-      logDev('server tidak dikenal: $server', prefix: 'animeEpisode:');
-      return null;
-  }
-}
-
-Future<String?> _fetchEpisodeServer1({
-  required String rawUrl,
-  required int eps,
-}) async {
-  try {
-    final trimmedUrl = rawUrl.trim();
-    if (trimmedUrl.isEmpty) {
-      return null;
-    }
-
-    logDev(
-      'fetchEpisodeFrom server 1 with rawUrl: $rawUrl, eps: $eps',
-      prefix: 'animeEpisode:',
-    );
-
-    final encodedUrl = base64Encode(utf8.encode(trimmedUrl));
-
-    final String apiUrl =
-        '$apiBaseUrl/api/nimegami/media?url=$encodedUrl&eps=$eps';
-
-    logDev('Requesting episode: $apiUrl', prefix: 'animeEpisode:');
-
-    final response = await _httpGetWithRetry(
-      Uri.parse(apiUrl),
-      timeout: const Duration(seconds: 60),
-      maxAttempts: 2,
-    );
-
-    logDev('Response status: ${response.body}', prefix: 'animeEpisode:');
-
-    if (response.statusCode != 200) {
-      logDev(
-        'Error Log: Server error episode dengan status ${response.statusCode}',
-        prefix: 'animeEpisode:',
-      );
-      return null;
-    }
-
-    final dynamic decodedDynamic = jsonDecode(response.body);
-
-    if (decodedDynamic is String && decodedDynamic.trim().isNotEmpty) {
-      return decodedDynamic.trim();
-    }
-
-    if (decodedDynamic is! Map<String, dynamic>) {
-      logDev(
-        'Error Log: Format response episode tidak valid.',
-        prefix: 'animeEpisode:',
-      );
-      return null;
-    }
-
-    final directUrl =
-        decodedDynamic['url']?.toString().trim() ??
-        decodedDynamic['videoUrl']?.toString().trim() ??
-        decodedDynamic['streamUrl']?.toString().trim() ??
-        '';
-
-    logDev('directUrl: $directUrl', prefix: 'animeEpisode:');
-
-    if (directUrl.isNotEmpty) {
-      return directUrl;
-    }
-
-    final data = decodedDynamic['data'];
-    if (data is Map<String, dynamic>) {
-      final nestedUrl =
-          data['url']?.toString().trim() ??
-          data['videoUrl']?.toString().trim() ??
-          data['streamUrl']?.toString().trim() ??
-          '';
-      logDev('Nested URL: $nestedUrl', prefix: 'animeEpisode:');
-      if (nestedUrl.isNotEmpty) {
-        return nestedUrl;
-      }
-    }
-
-    return null;
-  } catch (error, stackTrace) {
-    logDev(
-      'Error Log: Terjadi kesalahan fatal saat ambil episode: $error\n$stackTrace',
-      prefix: 'animeEpisode:',
-    );
-    return null;
-  }
-}
-
-Future<String?> _fetchEpisodeServer2({
-  required String rawUrl,
-  required int eps,
-}) async {
-  VideoScraperService videoScraperService = new VideoScraperService();
-  try {
-    final trimmedUrl = rawUrl.trim();
-    if (trimmedUrl.isEmpty) {
-      return null;
-    }
-
-    logDev(
-      'fetchEpisodeFrom server 2 with rawUrl: $rawUrl, eps: $eps',
-      prefix: 'animeEpisode:',
-    );
-
-    final encodedUrl = Uri.encodeQueryComponent(trimmedUrl);
-
-    final String apiUrl =
-        '$apiBaseUrl/api/zoronime/media?url=$encodedUrl&eps=$eps';
-
-    logDev('Requesting episode: $apiUrl', prefix: 'animeEpisode:');
-
-    final response = await _httpGetWithRetry(
-      Uri.parse(apiUrl),
-      timeout: const Duration(seconds: 60),
-      maxAttempts: 2,
-    );
-
-    logDev('Response status: ${response.body}', prefix: 'animeEpisode:');
-
-    if (response.statusCode != 200) {
-      logDev(
-        'Error Log: Server error episode dengan status ${response.statusCode}',
-        prefix: 'animeEpisode:',
-      );
-      return null;
-    }
-
-    final dynamic decodedDynamic = jsonDecode(response.body);
-
-    if (decodedDynamic is String && decodedDynamic.trim().isNotEmpty) {
-      return decodedDynamic.trim();
-    }
-
-    if (decodedDynamic is! Map<String, dynamic>) {
-      logDev(
-        'Error Log: Format response episode tidak valid.',
-        prefix: 'animeEpisode:',
-      );
-      return null;
-    }
-    
-    if(checkIsDesudesustream(decodedDynamic['url']?.toString() ?? '')) {
-      logDev('URL terdeteksi dari desustream, mencoba ekstrak blogger URL...', prefix: 'animeEpisode:');
-      final result = await VideoScraperService.resolveVideoFromUrl(decodedDynamic['url']?.toString() ?? '');
-      print(result!.videoUrl);
-      return result!.videoUrl;
-    }
-
-    final directFileId = decodedDynamic['url']?.toString().trim() ?? '';
-    final directUrl = directFileId.isNotEmpty
-        ? (await getOdvidhideUrl(directFileId))?.trim() ?? ''
-        : '';
-
-    logDev('directUrl: $directUrl', prefix: 'animeEpisode:');
-
-    if (directUrl.isNotEmpty) {
-      return directUrl;
-    }
-
-    final data = decodedDynamic['data'];
-    if (data is Map<String, dynamic>) {
-      final nestedFileId = data['url']?.toString().trim() ?? '';
-      final nestedUrl = nestedFileId.isNotEmpty
-          ? (await getOdvidhideUrl(nestedFileId))?.trim() ?? ''
-          : '';
-      logDev('Nested URL: $nestedUrl', prefix: 'animeEpisode:');
-      if (nestedUrl.isNotEmpty) {
-        return nestedUrl;
-      }
-    }
-
-    return null;
-  } catch (error, stackTrace) {
-    logDev(
-      'Error Log: Terjadi kesalahan fatal saat ambil episode: $error\n$stackTrace',
-      prefix: 'animeEpisode:',
-    );
-    return null;
-  }
-}
-
-bool checkIsDesudesustream(streamUrl) {
-  // 1. Parse the URL
-  Uri uri = Uri.parse(streamUrl);
-
-  // 2. Check if the host matches
-  bool isDesuStream = uri.host == 'desustream.info';
-
-  if (isDesuStream) {
-    // final result = await VideoScraperService.resolveVideoFromUrl(streamUrl);
-    return true;
-  } else {
-    // print("Domain does not match.");
-    return false;
-  }
-}
-
 Future<Anime> detailAnime(String url, {int serverId = 1}) async {
   logDev(
     'detailAnime called with url: $url, serverId: $serverId',
@@ -691,12 +378,12 @@ Future<Anime> detailAnime(String url, {int serverId = 1}) async {
       : '/api/nimegami/anime';
 
   //jika serverid 1 itu pake tobase64, jika serverid 2 dia tidak pake tobase64
-  // final response = await _httpGetWithRetry(
+  // final response = await httpGetWithRetry(
   //   Uri.parse('$apiBaseUrl$endpoint?url=${toBase64(trimmedUrl)}'),
   //   timeout: const Duration(seconds: 45),
   //   maxAttempts: 2,
   // );
-  final response = await _httpGetWithRetry(
+  final response = await httpGetWithRetry(
     Uri.parse(
       serverId == 2
           ? '$apiBaseUrl$endpoint?url=${Uri.encodeQueryComponent(trimmedUrl)}'
@@ -735,13 +422,13 @@ Future<Anime> detailAnime(String url, {int serverId = 1}) async {
       animePayload['name']?.toString().trim() ??
       '';
   final safeTitle = rawTitle.isEmpty ? 'Untitled Anime' : rawTitle;
-  final fallbackImage = _normalizeAnimeImageUrl(
+  final fallbackImage = normalizeAnimeImageUrl(
     animePayload['imageUrl']?.toString(),
     fallbackTitle: safeTitle,
   );
 
   final imageUrl = (animePayload['images'] is Map<String, dynamic>)
-      ? _extractBestImageUrl(animePayload['images'], fallbackTitle: safeTitle)
+      ? extractBestImageUrl(animePayload['images'], fallbackTitle: safeTitle)
       : fallbackImage;
 
   return Anime(
@@ -763,7 +450,7 @@ Future<Anime> detailAnime(String url, {int serverId = 1}) async {
         ? animePayload['sourceUrl'].toString().trim()
         : trimmedUrl,
     detailUrl: trimmedUrl,
-    episodes: _parseEpisodeCount(
+    episodes: parseEpisodeCount(
       animePayload['last_episode'] ?? animePayload['episodes'],
     ),
   );
@@ -803,32 +490,13 @@ List<String> _parseGenres(dynamic rawGenres) {
   return genres.isEmpty ? ['Unknown'] : genres;
 }
 
-void logInfo(String message) {
-  developer.log(message, name: 'ExampleScreen');
-}
-
-void logError(String message, Object error, StackTrace stackTrace) {
-  developer.log(
-    message,
-    name: 'ExampleScreen',
-    error: error,
-    stackTrace: stackTrace,
-  );
-}
-
-void showErrorSnackBar(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
-}
-
 String toBase64(String input) {
   List<int> bytes = utf8.encode(input);
   String base64Encoded = base64Encode(bytes);
   return base64Encoded;
 }
 
-Future<http.Response> _httpGetWithRetry(
+Future<http.Response> httpGetWithRetry(
   Uri uri, {
   required Duration timeout,
   int maxAttempts = 2,
@@ -858,80 +526,39 @@ Future<http.Response> _httpGetWithRetry(
   throw TimeoutException('Request gagal setelah retry', timeout);
 }
 
-Future<List<Anime>> getSchedules() async {
-  logDev('schedules called', prefix: 'getSchedules:');
-  try {
-    final response = await _httpGetWithRetry(
-      Uri.parse('$apiBaseUrl/api/nimegami/schedules'),
-      timeout: const Duration(seconds: 60),
-      maxAttempts: 2,
-    );
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Schedules API gagal dengan status ${response.statusCode}',
-      );
-    }
-
-    final dynamic decoded = jsonDecode(response.body);
-    final List<dynamic> rawSchedules;
-
-    if (decoded is Map<String, dynamic> && decoded['animeUpdates'] is List) {
-      rawSchedules = decoded['animeUpdates'] as List<dynamic>;
-    } else if (decoded is List) {
-      rawSchedules = decoded;
-    } else {
-      throw Exception('Format response schedules tidak valid');
-    }
-
-    final schedules = rawSchedules.whereType<Map<String, dynamic>>().map((
-      item,
-    ) {
-      final episode = _parseEpisodeCount(item['last_episode']);
-      final sourceUrl = item['sourceUrl']?.toString().trim() ?? '';
-      final title = item['title']?.toString().trim();
-      final synopsis = item['synopsis']?.toString().trim();
-
-      final images = item['images'];
-
-      final score = item['score'];
-      final rating = score is num
-          ? score.toDouble()
-          : double.tryParse('$score') ?? 0.0;
-
-      final genres = (item['genres'] as List<dynamic>?)
-          ?.where((genre) => genre != null)
-          .map((genre) => genre.toString())
-          .where((genre) => genre.isNotEmpty)
-          .toList();
-
-      return Anime(
-        title: (title == null || title.isEmpty) ? 'Untitled Anime' : title,
-        imageUrl: _extractBestImageUrl(
-          images,
-          fallbackTitle: (title == null || title.isEmpty) ? 'unknown' : title,
-        ),
-        rating: rating,
-        genres: (genres == null || genres.isEmpty) ? ['Unknown'] : genres,
-        synopsis: (synopsis == null || synopsis.isEmpty)
-            ? 'No synopsis available'
-            : synopsis,
-        sourceUrl: sourceUrl,
-        episodes: episode,
-      );
-    }).toList();
-
-    dummyAnimes = schedules;
-    return schedules;
-  } catch (error, stackTrace) {
-    logDev(
-      'schedules request failed: $error\n$stackTrace',
-      prefix: 'getSchedules:',
-    );
-    return [];
+String normalizeAnimeImageUrl(
+  String? rawUrl, {
+  required String fallbackTitle,
+}) {
+  final value = rawUrl?.trim() ?? '';
+  if (value.isEmpty) {
+    return fallbackImageForTitle(fallbackTitle);
   }
+
+  final parsed = Uri.tryParse(value);
+  if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+    return fallbackImageForTitle(fallbackTitle);
+  }
+
+  var normalized = parsed;
+  if (normalized.scheme == 'http') {
+    normalized = normalized.replace(scheme: 'https');
+  }
+
+  if (normalized.host == 'myanimelist.net' &&
+      normalized.pathSegments.isNotEmpty &&
+      normalized.pathSegments.first == 'images') {
+    normalized = normalized.replace(host: 'cdn.myanimelist.net');
+  }
+
+  return normalized.toString();
 }
 
-int _parseEpisodeCount(dynamic value) {
+String fallbackImageForTitle(String title) {
+  return 'https://picsum.photos/seed/${Uri.encodeComponent(title)}/400/600';
+}
+
+int parseEpisodeCount(dynamic value) {
   if (value is int) {
     return value;
   }
@@ -944,101 +571,84 @@ int _parseEpisodeCount(dynamic value) {
   return 0;
 }
 
-Future<String?> getOdvidhideUrl(String vidhideUrl) async {
-  final embedUrl = Uri.parse(vidhideUrl.trim());
-
-  try {
-    // 1. Fetch HTML embed page
-    final response = await http
-        .get(
-          embedUrl,
-          headers: {
-            "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://odvidhide.com/",
-            "Accept":
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          },
-        )
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode != 200) {
-      throw Exception("Gagal memuat halaman: HTTP ${response.statusCode}");
-    }
-
-    final html = response.body;
-
-    // 2. Cari packed script
-    final packerRegex = RegExp(
-      r"eval\(function\(p,a,c,k,e,d\)[\s\S]+?\.split\('\|'\)\)\)",
-    );
-    final packerMatch = packerRegex.firstMatch(html);
-    if (packerMatch == null) throw Exception("Packed script tidak ditemukan");
-
-    final packedScript = packerMatch.group(0)!;
-
-    // Decode JavaScript Packer (p,a,c,k,e,d) secara inline
-    final decodeRegex = RegExp(
-      r"}\s*\(\s*'([\s\S]*?)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([\s\S]*?)'\.split\(\s*'\|'\s*\)",
-    );
-    final decodeMatch = decodeRegex.firstMatch(packedScript);
-    if (decodeMatch == null) throw Exception("Tidak bisa parse packed script");
-
-    String p = decodeMatch.group(1)!;
-    final int a = int.parse(decodeMatch.group(2)!);
-    final int c = int.parse(decodeMatch.group(3)!);
-    final List<String> k = decodeMatch.group(4)!.split('|');
-
-    // Proses decoding
-    for (int i = c - 1; i >= 0; i--) {
-      // Sama seperti `if (k[i])` di JS
-      if (i < k.length && k[i].isNotEmpty) {
-        // toRadixString di Dart berfungsi persis seperti toString(radix) di JS (mendukung base 2-36)
-        final radixStr = i.toRadixString(a);
-        p = p.replaceAll(RegExp(r'\b' + radixStr + r'\b'), k[i]);
-      }
-    }
-
-    final decoded = p;
-
-    // 3. Cari object links/o yang berisi video sources
-    final objectRegex = RegExp(r"var\s+(?:links|o)\s*=\s*(\{[\s\S]*?\})\s*;");
-    final objectMatch = objectRegex.firstMatch(decoded);
-    if (objectMatch == null) throw Exception("Video sources tidak ditemukan");
-
-    final objectStr = objectMatch.group(1)!;
-
-    // 4. Ambil URL hls2
-    final hls2Regex = RegExp(r'''["']hls2["']\s*:\s*["']([^"']+)["']''');
-    final hls2Match = hls2Regex.firstMatch(objectStr);
-    if (hls2Match == null) throw Exception("URL hls2 tidak ditemukan");
-
-    final masterUrl = hls2Match.group(1)!;
-
-    // 5. Convert master.m3u8 → index-v1-a1.m3u8
-    final queryStart = masterUrl.indexOf("?");
-    String basePath = masterUrl;
-    String queryString = "";
-
-    if (queryStart != -1) {
-      basePath = masterUrl.substring(0, queryStart);
-      queryString = masterUrl.substring(queryStart);
-    }
-
-    // Replace master.m3u8 di akhir path lalu gabungkan dengan query string
-    final indexUrl =
-        basePath.replaceAll(RegExp(r'master\.m3u8$'), 'index-v1-a1.m3u8') +
-        queryString;
-
-    return indexUrl;
-  } catch (e) {
-    // Print error untuk mempermudah debugging
-    logDev('Error saat mengekstrak URL: $e', prefix: 'getOdvidhideUrl:');
-    return null;
+String extractBestImageUrl(dynamic images, {required String fallbackTitle}) {
+  if (images is! Map<String, dynamic>) {
+    return fallbackImageForTitle(fallbackTitle);
   }
+
+  final webp = images['webp'];
+  if (webp is Map<String, dynamic>) {
+    final large = webp['large_image_url']?.toString();
+    if (large != null && large.trim().isNotEmpty) {
+      return normalizeAnimeImageUrl(large, fallbackTitle: fallbackTitle);
+    }
+
+    final normal = webp['image_url']?.toString();
+    if (normal != null && normal.trim().isNotEmpty) {
+      return normalizeAnimeImageUrl(normal, fallbackTitle: fallbackTitle);
+    }
+  }
+
+  final jpg = images['jpg'];
+  if (jpg is Map<String, dynamic>) {
+    final large = jpg['large_image_url']?.toString();
+    if (large != null && large.trim().isNotEmpty) {
+      return normalizeAnimeImageUrl(large, fallbackTitle: fallbackTitle);
+    }
+
+    final normal = jpg['image_url']?.toString();
+    if (normal != null && normal.trim().isNotEmpty) {
+      return normalizeAnimeImageUrl(normal, fallbackTitle: fallbackTitle);
+    }
+  }
+
+  return fallbackImageForTitle(fallbackTitle);
 }
+
+Widget buildSafeAnimeImage(
+  String imageUrl, {
+  BoxFit fit = BoxFit.cover,
+  double? width,
+  double? height,
+}) {
+  return Image.network(
+    normalizeAnimeImageUrl(imageUrl, fallbackTitle: 'unknown'),
+    width: width,
+    height: height,
+    fit: fit,
+    filterQuality: FilterQuality.medium,
+    errorBuilder: (_, __, ___) => Container(
+      width: width,
+      height: height,
+      color: const Color(0xFF1C1C24),
+      alignment: Alignment.center,
+      child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+    ),
+  );
+}
+
+/////logging utilities
 
 void logDev(String text, {String prefix = 'Dev Log:'}) {
   print('$prefix $text');
   unawaited(appendDevLogEntry('$prefix $text'));
+}
+
+void logInfo(String message) {
+  developer.log(message, name: 'ExampleScreen');
+}
+
+void logError(String message, Object error, StackTrace stackTrace) {
+  developer.log(
+    message,
+    name: 'ExampleScreen',
+    error: error,
+    stackTrace: stackTrace,
+  );
+}
+
+void showErrorSnackBar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }

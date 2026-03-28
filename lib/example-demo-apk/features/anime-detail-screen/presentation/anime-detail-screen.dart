@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/utils/utils.dart';
+import '../data/function.dart';
 import '../../anime-video-player-screen/presentation/anime-video-player-screen.dart';
 import '../data/sendReportToSupabase.dart';
 

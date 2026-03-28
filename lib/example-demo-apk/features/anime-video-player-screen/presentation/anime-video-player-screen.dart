@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../../core/utils/utils.dart';
-import '../../../core/utils/google-blog-direct.dart';
+import '../../anime-detail-screen/data/google-blog-direct.dart';
 
 
 // ==========================================

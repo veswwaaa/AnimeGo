@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/utils.dart';
 import '../../anime-video-player-screen/presentation/anime-video-player-screen.dart';
+import '../data/function.dart';
 
 // ==========================================
 // 3. HISTORY SCREEN
