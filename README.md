@@ -1,6 +1,8 @@
 # animego
 
 A new Flutter project.
+demo app:
+https://drive.google.com/file/d/16kclOtnsxN1RAr-mtq4d9g-xpWpPnJSQ/view?usp=sharing
 
 ## Getting Started
 
