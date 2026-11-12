@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/utils.dart';
-import '../../anime-detail-screen/presentation/anime-detail-screen.dart';
-import '../data/function.dart';
+import 'package:animego/example-demo-apk/core/utils/utils.dart';
+import 'package:animego/example-demo-apk/features/anime-detail-screen/presentation/anime-detail-screen.dart';
+import 'package:animego/example-demo-apk/features/home-screen/data/function.dart';
 
 // ==========================================
 // 1. HOME SCREEN

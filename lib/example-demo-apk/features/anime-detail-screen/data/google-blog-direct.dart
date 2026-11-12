@@ -94,8 +94,16 @@ class VideoScraperService {
       'Connection': 'keep-alive',
     };
 
+    // Host seperti archive.org atau host CDN lain tidak boleh menerima
+    // header Origin/Referer blogger karena bisa ditolak atau dialihkan.
     final uri = Uri.tryParse(videoUrl);
     if (uri == null) return headers;
+
+    if (!_isBloggerHost(uri.host)) {
+      headers.remove('Origin');
+      headers.remove('Referer');
+      headers.remove('Cookie');
+    }
 
     final cookieByName = <String, String>{};
     final cookieTargets = <Uri>[
@@ -117,6 +125,16 @@ class VideoScraperService {
     }
 
     return headers;
+  }
+
+  /// Host yang diputar lewat Blogger (googlevideo / blogger).
+  static bool _isBloggerHost(String host) {
+    return host.contains('googleapis.com') ||
+        host.contains('blogger.com') ||
+        host.contains('blogspot.com') ||
+        host.contains('ggpht.com') ||
+        host.contains('gvt1.com') ||
+        host.contains('youtube.com');
   }
 
   // ============================================================

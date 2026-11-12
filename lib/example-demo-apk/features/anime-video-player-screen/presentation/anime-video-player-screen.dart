@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import '../../../core/utils/utils.dart';
-import '../../anime-detail-screen/data/google-blog-direct.dart';
+import 'package:animego/example-demo-apk/core/utils/utils.dart';
+import 'package:animego/example-demo-apk/features/anime-detail-screen/data/google-blog-direct.dart';
 
 
 // ==========================================
@@ -35,6 +35,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   StreamSubscription<Duration>? _durationSubscription;
   bool _didSaveHistory = false;
   bool _didSeekInitialPosition = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -44,16 +45,24 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     _durationSubscription = _player.stream.duration.listen(
       _seekToInitialPositionWhenReady,
     );
+    _listenToPlayerErrors();
     _initializePlayer();
   }
 
-  Future<void> _initializePlayer() async {
-    // final hlsUrl = await getOdvidhideUrl("unx9ahyh9hzr");
-    // print("URL HLS: $hlsUrl");
+  /// Menangkap error dari mpv supaya penyebab gagalnya tampil di layar.
+  void _listenToPlayerErrors() {
+    _player.stream.error.listen((error) {
+      logDev('Player error: $error', prefix: 'AnimeVideoPlayer:');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = 'Gagal memuat video: $error';
+      });
+    });
+  }
 
-    // final targetUrl = (hlsUrl?.trim().isNotEmpty ?? false)
-    //     ? hlsUrl!
-    //     : widget.videoUrl;
+  Future<void> _initializePlayer() async {
     final targetUrl = widget.videoUrl;
     final parsedUri = Uri.tryParse(targetUrl);
     final fallbackUri = Uri.parse(
@@ -80,10 +89,39 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       videoUri.toString(),
     );
 
+    logDev(
+      'Membuka video: $videoUri dengan header: $playbackHeaders',
+      prefix: 'AnimeVideoPlayer:',
+    );
+
+    // Host|archive.org/umumnya butuh waktu lama sebelum moov ketemu,
+    // dan mpv default network-timeout cuma 5 detik.
+    await _setMpvProperty('network-timeout', '30');
+    await _setMpvProperty('demuxer-readahead-secs', '30');
+    // MP4 non-faststart (moov di akhir file) butuh buffering lebih besar.
+    await _setMpvProperty('demuxer-max-bytes', '64MiB');
+
     _player.open(
       Media(videoUri.toString(), httpHeaders: playbackHeaders),
       play: true,
     );
+  }
+
+  /// Mengatur properti mpv. Hanya tersedia di backend native.
+  Future<void> _setMpvProperty(String property, String value) async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) {
+      return;
+    }
+
+    try {
+      await platform.setProperty(property, value);
+    } catch (error) {
+      logDev(
+        'Gagal set mpv property $property: $error',
+        prefix: 'AnimeVideoPlayer:',
+      );
+    }
   }
 
   void _seekToInitialPositionWhenReady(Duration totalDuration) {
@@ -171,13 +209,46 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         body: Center(
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: Video(
-              controller: _videoController,
-              fit: BoxFit.contain,
-              controls: (state) => AdaptiveVideoControls(state),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Video(
+                  controller: _videoController,
+                  fit: BoxFit.contain,
+                  controls: (state) => AdaptiveVideoControls(state),
+                ),
+                if (_errorMessage != null) _buildErrorView(_errorMessage!),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView(String message) {
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.videoUrl,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.grey, fontSize: 11),
+          ),
+        ],
       ),
     );
   }

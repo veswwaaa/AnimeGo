@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/utils.dart';
-import '../../anime-video-player-screen/presentation/anime-video-player-screen.dart';
-import '../data/function.dart';
+import 'package:animego/example-demo-apk/core/utils/utils.dart';
+import 'package:animego/example-demo-apk/features/anime-video-player-screen/presentation/anime-video-player-screen.dart';
+import 'package:animego/example-demo-apk/features/history-screen/data/function.dart';
 
 // ==========================================
 // 3. HISTORY SCREEN

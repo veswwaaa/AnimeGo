@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import './features/main-navigation/presentation/main-navigation.dart';
+import 'package:animego/example-demo-apk/features/main-navigation/presentation/main-navigation.dart';
 
 
 class AniStreamApp extends StatelessWidget {

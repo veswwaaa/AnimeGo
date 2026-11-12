@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/utils.dart';
-import '../../anime-detail-screen/presentation/anime-detail-screen.dart';
+import 'package:animego/example-demo-apk/core/utils/utils.dart';
+import 'package:animego/example-demo-apk/features/anime-detail-screen/presentation/anime-detail-screen.dart';
+import 'package:animego/example-demo-apk/features/search-screen/data/otakudesu-search.dart';
+import 'widgets/otakudesu-search-results.dart';
 
 // ==========================================
 // 2. SEARCH SCREEN
@@ -28,6 +30,12 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _errorMessage;
   List<Anime> _searchResults = dummyAnimes;
 
+  // Mode sumber pencarian: 1 = Nimegami, 3 = Otakudesu.
+  int _selectedSource = 1;
+  bool _isOtakudesuLoading = false;
+  String? _otakudesuErrorMessage;
+  List<Anime> _otakudesuResults = [];
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -37,6 +45,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _onSearch(String value) async {
     final query = value.trim();
     if (query.isEmpty) {
+      return;
+    }
+
+    if (_selectedSource == 3) {
+      await _onSearchOtakudesu(query);
       return;
     }
 
@@ -74,6 +87,53 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     }
+  }
+
+  Future<void> _onSearchOtakudesu(String query) async {
+    setState(() {
+      _isOtakudesuLoading = true;
+      _otakudesuErrorMessage = null;
+    });
+
+    try {
+      final results = await searchAnimeOtakudesu(query);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _otakudesuResults = results;
+      });
+    } catch (error, stackTrace) {
+      logError(
+        'SearchScreen._onSearchOtakudesu gagal untuk query "$query"',
+        error,
+        stackTrace,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _otakudesuErrorMessage =
+            'Gagal mencari anime di Otakudesu. Cek koneksi lalu coba lagi.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOtakudesuLoading = false;
+        });
+      }
+    }
+  }
+
+  void _openAnimeDetail(Anime anime) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnimeDetailScreen(anime: anime),
+      ),
+    );
   }
 
   @override
@@ -132,8 +192,67 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Expanded(child: _buildSearchContent()),
+          _buildSourceSwitcher(),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _selectedSource == 3
+                ? OtakudesuSearchResults(
+                    results: _otakudesuResults,
+                    isLoading: _isOtakudesuLoading,
+                    errorMessage: _otakudesuErrorMessage,
+                    onTapAnime: _openAnimeDetail,
+                  )
+                : _buildSearchContent(),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSourceSwitcher() {
+    const sourceIds = [1, 3];
+    const sourceLabels = {1: 'Nimegami', 3: 'Otakudesu'};
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C24),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: sourceIds.map((sourceId) {
+            final isSelected = sourceId == _selectedSource;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedSource = sourceId;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFFFF7A00)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    sourceLabels[sourceId]!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

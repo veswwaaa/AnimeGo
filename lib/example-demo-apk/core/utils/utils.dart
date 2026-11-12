@@ -4,7 +4,7 @@ import 'package:animego/example-demo-apk/features/anime-detail-screen/data/googl
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
+import 'package:animego/example-demo-apk/core/config/api_config.dart';
 import 'dart:developer' as developer;
 import 'hive_bootstrap.dart';
 import 'log_dev_storage_stub.dart';
@@ -18,6 +18,7 @@ class Anime {
   final double rating;
   final List<String> genres;
   final String synopsis;
+  final String status;
   String sourceUrl;
   String? detailUrl;
   int episodes;
@@ -30,6 +31,7 @@ class Anime {
     required this.sourceUrl,
     this.detailUrl,
     required this.episodes,
+    this.status = '',
     this.synopsis =
         "Yuji Itadori is a boy with tremendous physical strength, though he lives a completely ordinary high school life. One day, to save a friend who has been attacked by Curses, he eats a finger of Ryomen Sukuna, taking the Curse into his own soul.",
   });

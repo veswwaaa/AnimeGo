@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
-import '../../../core/utils/log_dev_storage_stub.dart';
+import 'package:animego/example-demo-apk/core/utils/log_dev_storage_stub.dart';
 
 class DeveloperScreen extends StatefulWidget {
   const DeveloperScreen({super.key});

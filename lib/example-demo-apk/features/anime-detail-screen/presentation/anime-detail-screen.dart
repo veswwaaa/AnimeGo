@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/utils/utils.dart';
-import '../data/function.dart';
-import '../../anime-video-player-screen/presentation/anime-video-player-screen.dart';
-import '../data/sendReportToSupabase.dart';
+import 'package:animego/example-demo-apk/core/utils/utils.dart';
+import 'package:animego/example-demo-apk/features/anime-detail-screen/data/function.dart';
+import 'package:animego/example-demo-apk/features/anime-video-player-screen/presentation/anime-video-player-screen.dart';
+import 'package:animego/example-demo-apk/features/anime-detail-screen/data/sendReportToSupabase.dart';
+import 'package:animego/example-demo-apk/features/search-screen/data/otakudesu-episodes.dart';
+import 'package:animego/example-demo-apk/features/search-screen/data/otakudesu-video.dart';
+import 'dart:developer' as developer;
 
 // ==========================================
 // 5. DETAIL SCREEN
@@ -23,6 +26,13 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   int serverId = 1;
   bool _isRefreshingDetail = false;
 
+  // Anime yang berasal dari Otakudesu memakai daftar episode sendiri.
+  bool get _isOtakudesuAnime =>
+      _anime.sourceUrl.contains('otakudesu.blog');
+
+  List<OtakudesuEpisode> _otakudesuEpisodes = [];
+  bool _isLoadingOtakudesuEpisodes = false;
+
   Anime _cloneAnime(Anime source) {
     return Anime(
       title: source.title,
@@ -30,6 +40,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
       rating: source.rating,
       genres: List<String>.from(source.genres),
       synopsis: source.synopsis,
+      status: source.status,
       sourceUrl: source.sourceUrl,
       detailUrl: source.detailUrl,
       episodes: source.episodes,
@@ -41,7 +52,71 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     super.initState();
     _anime = _cloneAnime(widget.anime);
     _initialAnime = _cloneAnime(widget.anime);
-    _refreshAnimeDetail();
+    if (_isOtakudesuAnime) {
+      _loadOtakudesuEpisodes();
+    } else {
+      _refreshAnimeDetail();
+    }
+  }
+
+  Future<void> _loadOtakudesuEpisodes() async {
+    setState(() {
+      _isLoadingOtakudesuEpisodes = true;
+    });
+
+    try {
+      final episodes = await getOtakudesuEpisodes(_anime.sourceUrl);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _otakudesuEpisodes = episodes;
+      });
+    } catch (error, stackTrace) {
+      logError(
+        'Gagal memuat daftar episode Otakudesu: ${_anime.title}',
+        error,
+        stackTrace,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingOtakudesuEpisodes = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openOtakudesuEpisode(OtakudesuEpisode episode) async {
+    showErrorSnackBar(context, 'Memuat episode ${episode.title}...');
+
+    final video = await getOtakudesuVideo(episode.url);
+    if (!mounted) {
+      return;
+    }
+
+    final episodeUrl = video.streamUrl;
+    if (!video.success || episodeUrl == null || episodeUrl.isEmpty) {
+      showErrorSnackBar(
+        context,
+        'Gagal memuat episode. Silakan coba lagi.',
+      );
+      return;
+    }
+    //tolong dong ketika episodeUrl berhasil diambil, print console terminal dong url nya biar bisa saya cross check
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnimeVideoPlayerScreen(
+          title: _anime.title,
+          animeImageUrl: _anime.imageUrl,
+          episodeName: episode.title,
+          videoUrl: episodeUrl,
+        ),
+      ),
+    );
   }
 
   Future<void> _refreshAnimeDetail({
@@ -303,9 +378,11 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
-                              'Status - 2020',
-                              style: TextStyle(
+                            Text(
+                              _anime.status.isEmpty
+                                  ? 'Status - 2020'
+                                  : 'Status - ${_anime.status}',
+                              style: const TextStyle(
                                 color: Colors.grey,
                                 fontSize: 12,
                               ),
@@ -366,12 +443,16 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                     style: const TextStyle(color: Colors.grey, height: 1.5),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Select Server',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Row(
-                    children: [
+                  if (!_isOtakudesuAnime) ...[
+                    const Text(
+                      'Select Server',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Row(
+                      children: [
                       Expanded(
                         child: GestureDetector(
                           onTap: () => _changeServer(1),
@@ -451,15 +532,21 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                         ),
                       ),
                     ],
-                  ),
+                    ),
+                  ],
                   Text(
-                    'Episodes ($episodeCount)',
+                    _isOtakudesuAnime
+                        ? 'Episodes (${_otakudesuEpisodes.length})'
+                        : 'Episodes ($episodeCount)',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (_isOtakudesuAnime)
+                    _buildOtakudesuEpisodeList()
+                  else ...[
                   if (_isRefreshingDetail)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 12),
@@ -507,6 +594,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                               );
                               return;
                             }
+
+                            print('[Server $serverId] Episode URL: $episodeUrl');
 
                             Navigator.push(
                               context,
@@ -557,12 +646,73 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                         );
                       },
                     ),
+                  ],
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOtakudesuEpisodeList() {
+    if (_isLoadingOtakudesuEpisodes) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 12),
+        child: LinearProgressIndicator(minHeight: 2),
+      );
+    }
+
+    if (_otakudesuEpisodes.isEmpty) {
+      return const Text(
+        'Episode belum tersedia',
+        style: TextStyle(color: Colors.grey),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _otakudesuEpisodes.length,
+      padding: EdgeInsets.zero,
+      itemBuilder: (context, index) {
+        final episode = _otakudesuEpisodes[index];
+        return GestureDetector(
+          onTap: () => _openOtakudesuEpisode(episode),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14141A),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1C1C24),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
+                  color: Colors.grey,
+                  size: 20,
+                ),
+              ),
+              title: Text(
+                episode.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text(
+                'Otakudesu',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

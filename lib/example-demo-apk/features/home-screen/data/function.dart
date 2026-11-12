@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:animego/example-demo-apk/core/config/api_config.dart';
 import 'package:animego/example-demo-apk/core/utils/utils.dart';
 
@@ -66,7 +65,6 @@ Future<List<Anime>> getSchedules() async {
       );
     }).toList();
 
-    dummyAnimes = schedules;
     return schedules;
   } catch (error, stackTrace) {
     logDev(
@@ -76,4 +74,3 @@ Future<List<Anime>> getSchedules() async {
     return [];
   }
 }
-

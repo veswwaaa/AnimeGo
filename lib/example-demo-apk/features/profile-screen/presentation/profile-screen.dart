@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../developer-screen/presentation/developer-screen.dart';
+import 'package:animego/example-demo-apk/features/developer-screen/presentation/developer-screen.dart';
 
 // ==========================================
 // 4. PROFILE SCREEN

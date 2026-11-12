@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../home-screen/presentation/home-screen.dart';
-import '../../search-screen/presentation/search-screen.dart';
-import '../../history-screen/presentation/history-screen.dart';
-import '../../profile-screen/presentation/profile-screen.dart';
+import 'package:animego/example-demo-apk/features/home-screen/presentation/home-screen.dart';
+import 'package:animego/example-demo-apk/features/search-screen/presentation/search-screen.dart';
+import 'package:animego/example-demo-apk/features/history-screen/presentation/history-screen.dart';
+import 'package:animego/example-demo-apk/features/profile-screen/presentation/profile-screen.dart';
 
 // ==========================================
 // MAIN NAVIGATION (BOTTOM NAVBAR)
