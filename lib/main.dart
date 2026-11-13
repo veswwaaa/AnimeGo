@@ -1,8 +1,8 @@
 // import 'package:animego/example-screen.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:animego/example-demo-apk/ani-stream-app.dart';
-import 'package:animego/example-demo-apk/core/utils/utils.dart';
+import 'package:animego/app.dart';
+import 'package:animego/core/utils/utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // import 'package:animego/hls-player.dart';
 

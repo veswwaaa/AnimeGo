@@ -1,5 +1,5 @@
-import 'package:animego/example-demo-apk/features/search-screen/data/otakudesu-episodes.dart';
-import 'package:animego/example-demo-apk/features/search-screen/data/otakudesu-video.dart';
+import 'package:animego/features/search-screen/data/otakudesu-episodes.dart';
+import 'package:animego/features/search-screen/data/otakudesu-video.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const String _animePageHtml = '''

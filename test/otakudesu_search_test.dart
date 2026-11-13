@@ -1,4 +1,4 @@
-import 'package:animego/example-demo-apk/features/search-screen/data/otakudesu-search.dart';
+import 'package:animego/features/search-screen/data/otakudesu-search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const String _otakudesuSearchHtml = '''
