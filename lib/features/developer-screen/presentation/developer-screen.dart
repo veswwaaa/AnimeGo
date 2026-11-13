@@ -30,10 +30,7 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
       appBar: AppBar(
         title: const Text('Debug Console'),
         actions: [
-          IconButton(
-            onPressed: _refreshLogs,
-            icon: const Icon(Icons.refresh),
-          ),
+          IconButton(onPressed: _refreshLogs, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: Center(
@@ -66,7 +63,8 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
 
               return ListView.separated(
                 itemCount: logs.length,
-                separatorBuilder: (_, __) => const Divider(color: Colors.white12),
+                separatorBuilder: (_, __) =>
+                    const Divider(color: Colors.white12),
                 itemBuilder: (context, index) {
                   final log = logs[index];
                   return Column(

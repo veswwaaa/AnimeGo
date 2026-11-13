@@ -33,7 +33,10 @@ class ProviderHttpException implements Exception {
 
   @override
   String toString() =>
-      'ProviderHttpException(' + (statusCode?.toString() ?? '-') + '): ' + message;
+      'ProviderHttpException(' +
+      (statusCode?.toString() ?? '-') +
+      '): ' +
+      message;
 }
 
 /// Melakukan GET dengan retry + backoff.
@@ -96,10 +99,7 @@ Future<String> httpHeadFinalUrl(
 
 /// Menggabungkan header custom dengan header default browser.
 Map<String, String> mergeHeaders(Map<String, String>? custom) {
-  return {
-    ...kDefaultBrowserHeaders,
-    ...?custom,
-  };
+  return {...kDefaultBrowserHeaders, ...?custom};
 }
 
 /// Menjalankan [action] dengan maksimal [maxAttempts] percobaan.

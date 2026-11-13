@@ -6,10 +6,7 @@ import 'package:animego/core/repositories/provider_anime_repository.dart';
 /// Ini adalah "sesuatu" pada diagram arsitektur: satu titik yang memegang
 /// semua provider dan meneruskan request ke layer di bawahnya.
 class ProviderContainer {
-  ProviderContainer._({
-    required this.registry,
-    required this.repository,
-  });
+  ProviderContainer._({required this.registry, required this.repository});
 
   factory ProviderContainer.create({ProviderRegistry? registry}) {
     final resolved = registry ?? appProviderRegistry;

@@ -110,9 +110,7 @@ class ZoronimeStreamResolver {
       queryString = masterUrl.substring(queryStart);
     }
 
-    return basePath.replaceAll(
-      RegExp(r'master\.m3u8$'),
-      'index-v1-a1.m3u8',
-    ) + queryString;
+    return basePath.replaceAll(RegExp(r'master\.m3u8$'), 'index-v1-a1.m3u8') +
+        queryString;
   }
 }

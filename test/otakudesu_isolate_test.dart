@@ -1,6 +1,6 @@
-import 'package:animego/features/search-screen/data/otakudesu-episodes.dart';
-import 'package:animego/features/search-screen/data/otakudesu-search.dart';
-import 'package:animego/features/search-screen/data/otakudesu-video.dart';
+import 'package:animego/core/providers/otakudesu_provider/episodes.dart';
+import 'package:animego/core/providers/otakudesu_provider/search.dart';
+import 'package:animego/core/providers/otakudesu_provider/video.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const String _searchHtml = '''
@@ -25,45 +25,45 @@ const String _animePageHtml = '''
 ''';
 
 void main() {
-    group('parsing di background isolate', () {
-        test('parseOtakudesuSearchResultsAsync menghasilkan hasil yang sama '
-            'dengan versi sinkron', () async {
-            final sync = parseOtakudesuSearchResults(_searchHtml);
-            final async = await parseOtakudesuSearchResultsAsync(_searchHtml);
+  group('parsing di background isolate', () {
+    test('parseOtakudesuSearchResultsAsync menghasilkan hasil yang sama '
+        'dengan versi sinkron', () async {
+      final sync = parseOtakudesuSearchResults(_searchHtml);
+      final async = await parseOtakudesuSearchResultsAsync(_searchHtml);
 
-            expect(async, hasLength(sync.length));
-            expect(async.first.title, sync.first.title);
-            expect(async.first.sourceUrl, sync.first.sourceUrl);
-            expect(async.first.rating, sync.first.rating);
-            expect(async.first.genres, sync.first.genres);
-        });
+      expect(async, hasLength(sync.length));
+      expect(async.first.title, sync.first.title);
+      expect(async.first.sourceUrl, sync.first.sourceUrl);
+      expect(async.first.rating, sync.first.rating);
+      expect(async.first.genres, sync.first.genres);
+    });
 
-        test('parseOtakudesuEpisodesAsync mengurutkan episode by nomor', () async {
-            final episodes = await parseOtakudesuEpisodesAsync(_animePageHtml);
+    test('parseOtakudesuEpisodesAsync mengurutkan episode by nomor', () async {
+      final episodes = await parseOtakudesuEpisodesAsync(_animePageHtml);
 
-            expect(episodes, hasLength(3));
-            expect(episodes.first.url, contains('episode-1'));
-            expect(episodes.last.url, contains('episode-10'));
-        });
+      expect(episodes, hasLength(3));
+      expect(episodes.first.url, contains('episode-1'));
+      expect(episodes.last.url, contains('episode-10'));
+    });
 
-        test('parseOtakudesuAnimeDetailAsync mengembalikan DTO lengkap',
-            () async {
-            final detail = await parseOtakudesuAnimeDetailAsync(
-                '<html><body><h1 class="entry-title">Bleach</h1>'
-                '<div class="set"><b>Status</b> : Completed</div>'
-                '</body></html>',
-                sourceUrl: 'https://otakudesu.blog/anime/bleach/',
-            );
+    test('parseOtakudesuAnimeDetailAsync mengembalikan DTO lengkap', () async {
+      final detail = await parseOtakudesuAnimeDetailAsync(
+        '<html><body><h1 class="entry-title">Bleach</h1>'
+        '<div class="set"><b>Status</b> : Completed</div>'
+        '</body></html>',
+        sourceUrl: 'https://otakudesu.blog/anime/bleach/',
+      );
 
-            expect(detail.provider, 'otakudesu');
-            expect(detail.title, 'Bleach');
-            expect(detail.status, 'Completed');
-            expect(detail.id.composite, startsWith('otakudesu:'));
-        });
+      expect(detail.provider, 'otakudesu');
+      expect(detail.title, 'Bleach');
+      expect(detail.status, 'Completed');
+      expect(detail.id.composite, startsWith('otakudesu:'));
+    });
 
-        test('parseOtakudesuMirrorsAsync membaca mirror dari html episode',
-            () async {
-            const html = '''
+    test(
+      'parseOtakudesuMirrorsAsync membaca mirror dari html episode',
+      () async {
+        const html = '''
             <div class="mirrorstream">
               <ul class="m720p">
                 <li><a href="#" data-content="eyJpZCI6IjEiLCJpIjoiMiJ9">otakustream</a></li>
@@ -71,12 +71,13 @@ void main() {
             </div>
             ''';
 
-            final mirrors = await parseOtakudesuMirrorsAsync(html);
+        final mirrors = await parseOtakudesuMirrorsAsync(html);
 
-            expect(mirrors, hasLength(1));
-            expect(mirrors.first.quality, '720p');
-            expect(mirrors.first.provider, 'otakustream');
-            expect(mirrors.first.data?['id'], '1');
-        });
-    });
+        expect(mirrors, hasLength(1));
+        expect(mirrors.first.quality, '720p');
+        expect(mirrors.first.provider, 'otakustream');
+        expect(mirrors.first.data?['id'], '1');
+      },
+    );
+  });
 }

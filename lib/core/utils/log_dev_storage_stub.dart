@@ -12,10 +12,7 @@ class DevLogEntry {
   final String timestamp;
   final String message;
 
-  Map<String, String> toJson() => {
-    'timestamp': timestamp,
-    'message': message,
-  };
+  Map<String, String> toJson() => {'timestamp': timestamp, 'message': message};
 
   static DevLogEntry? fromMap(Map<dynamic, dynamic> map) {
     final timestamp = map['timestamp']?.toString().trim() ?? '';
@@ -37,9 +34,14 @@ Future<void> appendDevLogEntry(String text) async {
     final stored = box.get(_devLogsKey);
     final entries = (stored is List)
         ? stored
-            .whereType<Map>()
-            .map((e) => {'timestamp': e['timestamp']?.toString() ?? '', 'message': e['message']?.toString() ?? ''})
-            .toList()
+              .whereType<Map>()
+              .map(
+                (e) => {
+                  'timestamp': e['timestamp']?.toString() ?? '',
+                  'message': e['message']?.toString() ?? '',
+                },
+              )
+              .toList()
         : <Map<String, String>>[];
 
     entries.add({

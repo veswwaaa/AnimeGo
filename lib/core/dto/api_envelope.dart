@@ -38,8 +38,10 @@ class ApiEnvelope<T> {
   factory ApiEnvelope.success(T data, {Map<String, dynamic> meta = const {}}) =>
       ApiEnvelope<T>(data: data, meta: meta);
 
-  factory ApiEnvelope.failure(ApiError error, {Map<String, dynamic> meta = const {}}) =>
-      ApiEnvelope<T>(data: null, meta: meta, error: error);
+  factory ApiEnvelope.failure(
+    ApiError error, {
+    Map<String, dynamic> meta = const {},
+  }) => ApiEnvelope<T>(data: null, meta: meta, error: error);
 }
 
 /// Identitas anime yang unik lintas provider: `{providerId}:{providerLocalId}`.

@@ -69,15 +69,18 @@ Future<String?> getOdvidhideUrl(String fileId) async {
 
   try {
     // 1. Fetch HTML embed page
-    final response = await http.get(
-      embedUrl,
-      headers: {
-        "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://odvidhide.com/",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    ).timeout(const Duration(seconds: 15));
+    final response = await http
+        .get(
+          embedUrl,
+          headers: {
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://odvidhide.com/",
+            "Accept":
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+        )
+        .timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
       throw Exception("Gagal memuat halaman: HTTP ${response.statusCode}");
@@ -86,14 +89,18 @@ Future<String?> getOdvidhideUrl(String fileId) async {
     final html = response.body;
 
     // 2. Cari packed script
-    final packerRegex = RegExp(r"eval\(function\(p,a,c,k,e,d\)[\s\S]+?\.split\('\|'\)\)\)");
+    final packerRegex = RegExp(
+      r"eval\(function\(p,a,c,k,e,d\)[\s\S]+?\.split\('\|'\)\)\)",
+    );
     final packerMatch = packerRegex.firstMatch(html);
     if (packerMatch == null) throw Exception("Packed script tidak ditemukan");
 
     final packedScript = packerMatch.group(0)!;
 
     // Decode JavaScript Packer (p,a,c,k,e,d) secara inline
-    final decodeRegex = RegExp(r"}\s*\(\s*'([\s\S]*?)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([\s\S]*?)'\.split\(\s*'\|'\s*\)");
+    final decodeRegex = RegExp(
+      r"}\s*\(\s*'([\s\S]*?)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([\s\S]*?)'\.split\(\s*'\|'\s*\)",
+    );
     final decodeMatch = decodeRegex.firstMatch(packedScript);
     if (decodeMatch == null) throw Exception("Tidak bisa parse packed script");
 
@@ -107,11 +114,11 @@ Future<String?> getOdvidhideUrl(String fileId) async {
       // Sama seperti `if (k[i])` di JS
       if (i < k.length && k[i].isNotEmpty) {
         // toRadixString di Dart berfungsi persis seperti toString(radix) di JS (mendukung base 2-36)
-        final radixStr = i.toRadixString(a); 
+        final radixStr = i.toRadixString(a);
         p = p.replaceAll(RegExp(r'\b' + radixStr + r'\b'), k[i]);
       }
     }
-    
+
     final decoded = p;
 
     // 3. Cari object links/o yang berisi video sources
@@ -139,10 +146,11 @@ Future<String?> getOdvidhideUrl(String fileId) async {
     }
 
     // Replace master.m3u8 di akhir path lalu gabungkan dengan query string
-    final indexUrl = basePath.replaceAll(RegExp(r'master\.m3u8$'), 'index-v1-a1.m3u8') + queryString;
+    final indexUrl =
+        basePath.replaceAll(RegExp(r'master\.m3u8$'), 'index-v1-a1.m3u8') +
+        queryString;
 
     return indexUrl;
-
   } catch (e) {
     // Print error untuk mempermudah debugging
     print("Error saat mengekstrak URL: $e");

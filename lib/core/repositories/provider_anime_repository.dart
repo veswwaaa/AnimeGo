@@ -16,7 +16,7 @@ import 'package:animego/core/repositories/anime_repository.dart';
 /// harus membawa URL mentah antar layer.
 class ProviderAnimeRepository implements AnimeRepository {
   ProviderAnimeRepository({ProviderRegistry? registry, this.providerOrder})
-      : registry = registry ?? appProviderRegistry;
+    : registry = registry ?? appProviderRegistry;
 
   final ProviderRegistry registry;
 
@@ -75,10 +75,7 @@ class ProviderAnimeRepository implements AnimeRepository {
 
     return ApiEnvelope<List<AnimeDto>>.failure(
       lastApiError ??
-          const ApiError(
-            code: 'NO_RESULT',
-            message: 'Anime tidak ditemukan',
-          ),
+          const ApiError(code: 'NO_RESULT', message: 'Anime tidak ditemukan'),
     );
   }
 

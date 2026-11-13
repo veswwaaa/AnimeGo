@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animego/features/main-navigation/presentation/main-navigation.dart';
 
-
 class AniStreamApp extends StatelessWidget {
   const AniStreamApp({super.key});
 

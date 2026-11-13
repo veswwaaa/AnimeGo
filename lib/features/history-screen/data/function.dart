@@ -1,4 +1,3 @@
-
 String formatPlaybackPosition(Duration duration) {
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');

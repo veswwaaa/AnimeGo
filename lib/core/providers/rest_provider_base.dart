@@ -15,8 +15,8 @@ enum ParamEncoding { plain, query, base64 }
 /// timeout, dan encoding parameter URL (base64 vs query component).
 abstract class RestProviderBase implements AnimeProvider {
   RestProviderBase({http.Client? client, Random? random})
-      : _client = client ?? http.Client(),
-        _random = random ?? Random();
+    : _client = client ?? http.Client(),
+      _random = random ?? Random();
 
   final http.Client _client;
   final Random _random;

@@ -10,19 +10,19 @@ import 'package:animego/core/providers/rest_provider_base.dart';
 import 'package:animego/core/utils/http_client.dart';
 import 'package:animego/core/utils/image_utils.dart';
 
-/// Provider Zoronime (REST).
+/// Provider Nimegami (REST).
 ///
-/// Parameter URL di-encode dengan query encoding, sesuai kontrak API anime-api.
-class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
-  ZoronimeProvider({super.client, super.random});
+/// Parameter URL di-encode dengan base64, sesuai kontrak API anime-api.
+class NimegamiProvider extends RestProviderBase implements AnimeProvider {
+  NimegamiProvider({super.client, super.random});
 
-  static const String providerId = 'zoronime';
+  static const String providerId = 'nimegami';
 
   @override
   String get id => providerId;
 
   @override
-  String get displayName => 'Zoronime';
+  String get displayName => 'Nimegami';
 
   @override
   bool get supportsSearch => true;
@@ -40,7 +40,7 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
   String get baseUrl => apiBaseUrl;
 
   @override
-  ParamEncoding get paramEncoding => ParamEncoding.query;
+  ParamEncoding get paramEncoding => ParamEncoding.base64;
 
   @override
   Map<String, String> get extraHeaders => const <String, String>{};
@@ -51,9 +51,9 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
     if (trimmed.isEmpty) return const <AnimeDto>[];
 
     final normalized = _normalizeQuery(trimmed);
-    final uri = Uri.parse('$baseUrl/api/zoronime/search').replace(
-      queryParameters: {'q': normalized},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/nimegami/search',
+    ).replace(queryParameters: {'q': normalized});
 
     final response = await get(
       uri.toString(),
@@ -63,14 +63,14 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
 
     if (response.statusCode != 200) {
       throw ProviderHttpException(
-        'Search Zoronime gagal dengan status ${response.statusCode}',
+        'Search Nimegami gagal dengan status ${response.statusCode}',
         statusCode: response.statusCode,
       );
     }
 
     final decoded = jsonDecode(response.body);
     if (decoded is! List) {
-      throw const FormatException('Search Zoronime response bukan list');
+      throw const FormatException('Search Nimegami response bukan list');
     }
 
     final items = decoded.whereType<Map<String, dynamic>>().toList();
@@ -78,7 +78,10 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
     // Hindari N+1: ambil detail hanya jika data ringkas tidak cukup.
     final results = <AnimeDto>[];
     for (final item in items) {
-      final sourceUrl = _firstNonEmpty(item, const <String>['sourceUrl', 'url']);
+      final sourceUrl = _firstNonEmpty(item, const <String>[
+        'sourceUrl',
+        'url',
+      ]);
       final title = _titleOf(item);
 
       if (sourceUrl.isEmpty) {
@@ -103,9 +106,9 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
       throw const FormatException('sourceUrl kosong');
     }
 
-    final uri = Uri.parse('$baseUrl/api/zoronime/anime').replace(
-      queryParameters: {'url': encodeParam(trimmed)},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/nimegami/anime',
+    ).replace(queryParameters: {'url': encodeParam(trimmed)});
 
     final response = await get(
       uri.toString(),
@@ -115,14 +118,14 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
 
     if (response.statusCode != 200) {
       throw ProviderHttpException(
-        'Detail Zoronime gagal dengan status ${response.statusCode}',
+        'Detail Nimegami gagal dengan status ${response.statusCode}',
         statusCode: response.statusCode,
       );
     }
 
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('Detail Zoronime response bukan object');
+      throw const FormatException('Detail Nimegami response bukan object');
     }
 
     final payload = decoded['name'] is Map<String, dynamic>
@@ -194,7 +197,7 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
       throw const FormatException('Episode tanpa URL tidak bisa diputar');
     }
 
-    final uri = Uri.parse('$baseUrl/api/zoronime/media').replace(
+    final uri = Uri.parse('$baseUrl/api/nimegami/media').replace(
       queryParameters: {
         'url': encodeParam(sourceUrl),
         'eps': '${episode.number}',
@@ -209,7 +212,7 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
 
     if (response.statusCode != 200) {
       throw ProviderHttpException(
-        'Media Zoronime gagal dengan status ${response.statusCode}',
+        'Media Nimegami gagal dengan status ${response.statusCode}',
         statusCode: response.statusCode,
       );
     }
@@ -217,7 +220,7 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
     final decoded = jsonDecode(response.body);
     final direct = _extractMediaUrl(decoded);
     if (direct.isEmpty) {
-      throw ProviderHttpException('Media Zoronime tidak mengembalikan URL');
+      throw ProviderHttpException('Media Nimegami tidak mengembalikan URL');
     }
 
     return StreamDto(
@@ -230,12 +233,19 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
   String _extractMediaUrl(dynamic decoded) {
     if (decoded is String) return decoded.trim();
     if (decoded is! Map<String, dynamic>) return '';
-    final direct =
-        _firstNonEmpty(decoded, const <String>['url', 'videoUrl', 'streamUrl']);
+    final direct = _firstNonEmpty(decoded, const <String>[
+      'url',
+      'videoUrl',
+      'streamUrl',
+    ]);
     if (direct.isNotEmpty) return direct;
     final data = decoded['data'];
     if (data is Map<String, dynamic>) {
-      return _firstNonEmpty(data, const <String>['url', 'videoUrl', 'streamUrl']);
+      return _firstNonEmpty(data, const <String>[
+        'url',
+        'videoUrl',
+        'streamUrl',
+      ]);
     }
     return '';
   }
@@ -296,7 +306,6 @@ class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
     }
     return '';
   }
-
 
   String _normalizeQuery(String input) {
     return input

@@ -34,9 +34,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   /// ID anime komposit: `providerId:localId`.
   String get _animeCompositeId {
     final providerId = _anime.providerId;
-    final localId = _anime.sourceUrl.isEmpty
-        ? _anime.title
-        : _anime.sourceUrl;
+    final localId = _anime.sourceUrl.isEmpty ? _anime.title : _anime.sourceUrl;
     return providerId.isEmpty ? localId : providerId + ':' + localId;
   }
 
@@ -90,8 +88,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     if (stream == null || stream.url.isEmpty) {
       showErrorSnackBar(
         context,
-        envelope.error?.message ??
-            'Gagal memuat episode. Silakan coba lagi.',
+        envelope.error?.message ?? 'Gagal memuat episode. Silakan coba lagi.',
       );
       return;
     }

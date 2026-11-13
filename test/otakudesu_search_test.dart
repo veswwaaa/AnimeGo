@@ -1,4 +1,4 @@
-import 'package:animego/features/search-screen/data/otakudesu-search.dart';
+import 'package:animego/core/providers/otakudesu_provider/search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const String _otakudesuSearchHtml = '''
@@ -60,7 +60,10 @@ void main() {
     });
 
     test('mengembalikan list kosong untuk html tanpa hasil', () {
-      expect(parseOtakudesuSearchResults('<html><body></body></html>'), isEmpty);
+      expect(
+        parseOtakudesuSearchResults('<html><body></body></html>'),
+        isEmpty,
+      );
     });
 
     test('menerima style list-style dengan spasi', () {

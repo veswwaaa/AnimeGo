@@ -56,9 +56,7 @@ class VideoScraperService {
   // HELPER: Bersihkan URL dari escape unicode Google
   // ============================================================
   static String cleanGoogleUrl(String rawUrl) {
-    return rawUrl
-        .replaceAll(r'\u003d', '=')
-        .replaceAll(r'\u0026', '&');
+    return rawUrl.replaceAll(r'\u003d', '=').replaceAll(r'\u0026', '&');
   }
 
   // ============================================================
@@ -85,7 +83,9 @@ class VideoScraperService {
 
   // Header untuk request playback langsung ke googlevideo/blogger.
   // Tanpa header ini, sebagian URL akan mengembalikan unauthorized.
-  static Future<Map<String, String>> buildPlaybackHeaders(String videoUrl) async {
+  static Future<Map<String, String>> buildPlaybackHeaders(
+    String videoUrl,
+  ) async {
     final headers = <String, String>{
       'User-Agent': userAgent,
       'Referer': 'https://www.blogger.com/',
@@ -106,10 +106,7 @@ class VideoScraperService {
     }
 
     final cookieByName = <String, String>{};
-    final cookieTargets = <Uri>[
-      Uri.parse('https://www.blogger.com'),
-      uri,
-    ];
+    final cookieTargets = <Uri>[Uri.parse('https://www.blogger.com'), uri];
 
     for (final target in cookieTargets) {
       final cookies = await _cookieJar.loadForRequest(target);
@@ -146,12 +143,15 @@ class VideoScraperService {
 
       final response = await _dio.get(
         desuUrl,
-        options: Options(headers: {
-          'User-Agent': userAgent,
-          'Referer': 'https://desustream.info/',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
-        }),
+        options: Options(
+          headers: {
+            'User-Agent': userAgent,
+            'Referer': 'https://desustream.info/',
+            'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
+          },
+        ),
       );
 
       final document = html_parser.parse(response.data.toString());
@@ -167,7 +167,6 @@ class VideoScraperService {
       final cleanUrl = iframeSrc.replaceAll('&amp;', '&');
       print('[Desustream] Blogger URL: ${cleanUrl.substring(0, 60)}...');
       return cleanUrl;
-
     } catch (e) {
       print('[Desustream] ERROR: $e');
       return null;
@@ -194,15 +193,18 @@ class VideoScraperService {
       // ✅ Pakai header lengkap seperti JS untuk terlihat comme browser asli
       await _dio.get(
         targetUrl,
-        options: Options(headers: {
-          'User-Agent': userAgent,
-          'Referer': 'https://$origin/',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-        }),
+        options: Options(
+          headers: {
+            'User-Agent': userAgent,
+            'Referer': 'https://$origin/',
+            'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+          },
+        ),
       );
       print('[Scraper] Step A OK - Cookie session tersimpan');
 
@@ -216,24 +218,26 @@ class VideoScraperService {
           'f.req=[[["WcwnYd","[\\"$token\\",null,0]",null,"generic"]]]';
 
       print('[Scraper] Step B - Hitting BatchExecute API...');
-      
+
       final response = await _dio.post(
         rpcUrl,
         data: payload,
-        options: Options(headers: {
-          'User-Agent': userAgent,
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          'X-Same-Domain': '1',
-          'Origin': 'https://www.blogger.com',
-          'Referer': 'https://www.blogger.com/video.g',
-          'Accept': '*/*',
-          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'same-origin',
-        }),
+        options: Options(
+          headers: {
+            'User-Agent': userAgent,
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Same-Domain': '1',
+            'Origin': 'https://www.blogger.com',
+            'Referer': 'https://www.blogger.com/video.g',
+            'Accept': '*/*',
+            'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+          },
+        ),
       );
 
       // Step C: Strip prefix anti-XSSI Google dulu sebelum parse
@@ -276,9 +280,8 @@ class VideoScraperService {
 
       print('[Scraper] Berhasil: ${result.title} (${result.quality})');
       print('[Scraper] Video URL: ${result.videoUrl.substring(0, 60)}...');
-      
-      return result;
 
+      return result;
     } on DioException catch (e) {
       print('[Scraper] DioError: ${e.type} | ${e.message}');
       print('[Scraper] Status: ${e.response?.statusCode}');

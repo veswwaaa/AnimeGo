@@ -1,8 +1,8 @@
 import '../dto/anime_dto.dart';
 import 'anime_provider.dart';
-import 'nimegami_provider.dart';
-import 'otakudesu_provider.dart';
-import 'zoronime_provider.dart';
+import 'nimegami/nimegami_provider.dart';
+import 'otakudesu_provider/otakudesu_provider.dart';
+import 'zoronime/zoronime_provider.dart';
 
 /// Manager/aggregator ("sesuatu" pada diagram).
 ///
@@ -10,10 +10,10 @@ import 'zoronime_provider.dart';
 /// satu provider gagal (timeout, 403, hasil kosong).
 class ProviderRegistry {
   ProviderRegistry({List<AnimeProvider>? providers})
-      : _providers = {
-          for (final provider in providers ?? const <AnimeProvider>[])
-            provider.id: provider,
-        };
+    : _providers = {
+        for (final provider in providers ?? const <AnimeProvider>[])
+          provider.id: provider,
+      };
 
   final Map<String, AnimeProvider> _providers;
 

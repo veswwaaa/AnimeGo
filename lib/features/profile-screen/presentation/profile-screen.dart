@@ -70,11 +70,16 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileMenu(IconData icon, String title, String subtitle, /* not must have context */ [BuildContext? context]) {
+  Widget _buildProfileMenu(
+    IconData icon,
+    String title,
+    String subtitle /* not must have context */, [
+    BuildContext? context,
+  ]) {
     return GestureDetector(
       onTap: () {
-        if(context == null) return;
-        if(title == 'Developer Only') {
+        if (context == null) return;
+        if (title == 'Developer Only') {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const DeveloperScreen()),
@@ -89,7 +94,10 @@ class ProfileScreen extends StatelessWidget {
         ),
         child: ListTile(
           leading: Icon(icon, color: Colors.grey),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           subtitle: Text(
             subtitle,
             style: const TextStyle(color: Colors.grey, fontSize: 12),

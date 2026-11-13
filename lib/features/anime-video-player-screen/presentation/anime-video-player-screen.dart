@@ -5,7 +5,6 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dart';
 
-
 // ==========================================
 // 6. VIDEO PLAYER SCREEN (NEW)
 // ==========================================

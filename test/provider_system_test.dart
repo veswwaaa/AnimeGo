@@ -71,19 +71,22 @@ AnimeDto _dto(String provider, String title) {
 
 void main() {
   group('ProviderRegistry', () {
-    test('searchAll memakai provider pertama yang mengembalikan hasil', () async {
-      final registry = ProviderRegistry(
-        providers: [
-          _FakeProvider('a', const <AnimeDto>[]),
-          _FakeProvider('b', [_dto('b', 'Jujutsu')]),
-        ],
-      );
+    test(
+      'searchAll memakai provider pertama yang mengembalikan hasil',
+      () async {
+        final registry = ProviderRegistry(
+          providers: [
+            _FakeProvider('a', const <AnimeDto>[]),
+            _FakeProvider('b', [_dto('b', 'Jujutsu')]),
+          ],
+        );
 
-      final result = await registry.searchAll('jjk');
+        final result = await registry.searchAll('jjk');
 
-      expect(result.length, 1);
-      expect(result.first.provider, 'b');
-    });
+        expect(result.length, 1);
+        expect(result.first.provider, 'b');
+      },
+    );
 
     test('searchAll melewati provider yang melempar error', () async {
       final registry = ProviderRegistry(
@@ -103,7 +106,9 @@ void main() {
   group('ProviderAnimeRepository', () {
     test('search membungkus hasil di ApiEnvelope sukses', () async {
       final registry = ProviderRegistry(
-        providers: [_FakeProvider('a', [_dto('a', 'Jujutsu')])],
+        providers: [
+          _FakeProvider('a', [_dto('a', 'Jujutsu')]),
+        ],
       );
       final repository = ProviderAnimeRepository(registry: registry);
 
@@ -127,14 +132,17 @@ void main() {
       expect(envelope.error!.provider, 'a');
     });
 
-    test('detail menolak ID yang tidak punya format provider:localId', () async {
-      final registry = ProviderRegistry(providers: const <AnimeProvider>[]);
-      final repository = ProviderAnimeRepository(registry: registry);
+    test(
+      'detail menolak ID yang tidak punya format provider:localId',
+      () async {
+        final registry = ProviderRegistry(providers: const <AnimeProvider>[]);
+        final repository = ProviderAnimeRepository(registry: registry);
 
-      final envelope = await repository.detail('tanpa-provider');
+        final envelope = await repository.detail('tanpa-provider');
 
-      expect(envelope.isSuccess, isFalse);
-      expect(envelope.error!.code, 'INVALID_ID');
-    });
+        expect(envelope.isSuccess, isFalse);
+        expect(envelope.error!.code, 'INVALID_ID');
+      },
+    );
   });
 }
