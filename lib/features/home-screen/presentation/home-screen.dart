@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:animego/core/providers/provider_container.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/presentation/anime-detail-screen.dart';
-import 'package:animego/features/home-screen/data/function.dart';
 
 // ==========================================
 // 1. HOME SCREEN
@@ -19,7 +19,22 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _schedulesFuture = getSchedules();
+    _schedulesFuture = _loadSchedules();
+  }
+
+  Future<List<Anime>> _loadSchedules() async {
+    final registry = ProviderContainer.instance.registry;
+    final provider = registry['nimegami'];
+    if (provider == null || !provider.supportsSchedules) {
+      return const <Anime>[];
+    }
+    try {
+      final dtos = await provider.getSchedules();
+      return dtos.map(animeDtoToModel).toList();
+    } catch (error) {
+      logDev('gagal memuat jadwal: $error', prefix: 'HomeScreen:');
+      return const <Anime>[];
+    }
   }
 
   @override

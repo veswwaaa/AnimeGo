@@ -5,7 +5,6 @@ import 'package:animego/core/dto/anime_dto.dart';
 import 'package:animego/core/dto/api_envelope.dart';
 import 'package:animego/core/dto/episode_dto.dart';
 import 'package:animego/core/dto/stream_dto.dart';
-import 'package:animego/core/providers/anime_provider.dart';
 import 'package:animego/core/providers/rest_provider_base.dart';
 import 'package:animego/core/utils/http_client.dart';
 import 'package:animego/core/utils/image_utils.dart';
@@ -13,7 +12,7 @@ import 'package:animego/core/utils/image_utils.dart';
 /// Provider Zoronime (REST).
 ///
 /// Parameter URL di-encode dengan query encoding, sesuai kontrak API anime-api.
-class ZoronimeProvider extends RestProviderBase implements AnimeProvider {
+class ZoronimeProvider extends RestProviderBase {
   ZoronimeProvider({super.client, super.random});
 
   static const String providerId = 'zoronime';

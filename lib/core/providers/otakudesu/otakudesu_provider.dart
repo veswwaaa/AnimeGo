@@ -15,7 +15,7 @@ import 'package:animego/core/providers/otakudesu/video.dart';
 /// Sumber data diambil langsung dari `otakudesu.blog` tanpa melewati backend,
 /// sehingga tetap gratis tanpa server. Parser yang dipakai sudah proven
 /// (lihat `features/search-screen/data/otakudesu-*.dart`).
-class OtakudesuProvider implements AnimeProvider {
+class OtakudesuProvider extends AnimeProvider {
   const OtakudesuProvider();
 
   static const String providerId = 'otakudesu';

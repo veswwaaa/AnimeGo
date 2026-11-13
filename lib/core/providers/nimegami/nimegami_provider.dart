@@ -5,15 +5,15 @@ import 'package:animego/core/dto/anime_dto.dart';
 import 'package:animego/core/dto/api_envelope.dart';
 import 'package:animego/core/dto/episode_dto.dart';
 import 'package:animego/core/dto/stream_dto.dart';
-import 'package:animego/core/providers/anime_provider.dart';
 import 'package:animego/core/providers/rest_provider_base.dart';
 import 'package:animego/core/utils/http_client.dart';
 import 'package:animego/core/utils/image_utils.dart';
+import 'package:animego/core/providers/nimegami/nimegami_schedules.dart';
 
 /// Provider Nimegami (REST).
 ///
 /// Parameter URL di-encode dengan base64, sesuai kontrak API anime-api.
-class NimegamiProvider extends RestProviderBase implements AnimeProvider {
+class NimegamiProvider extends RestProviderBase {
   NimegamiProvider({super.client, super.random});
 
   static const String providerId = 'nimegami';
@@ -35,6 +35,14 @@ class NimegamiProvider extends RestProviderBase implements AnimeProvider {
 
   @override
   bool get supportsStream => true;
+
+  @override
+  bool get supportsSchedules => true;
+
+  @override
+  Future<List<AnimeDto>> getSchedules() async {
+    return fetchNimegamiSchedules(baseUrl: baseUrl);
+  }
 
   @override
   String get baseUrl => apiBaseUrl;

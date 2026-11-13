@@ -13,7 +13,7 @@ enum ParamEncoding { plain, query, base64 }
 ///
 /// Menyeragamkan detail HTTP: User-Agent browser, retry + backoff + jitter,
 /// timeout, dan encoding parameter URL (base64 vs query component).
-abstract class RestProviderBase implements AnimeProvider {
+abstract class RestProviderBase extends AnimeProvider {
   RestProviderBase({http.Client? client, Random? random})
     : _client = client ?? http.Client(),
       _random = random ?? Random();

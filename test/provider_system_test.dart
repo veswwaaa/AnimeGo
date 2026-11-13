@@ -9,7 +9,7 @@ import 'package:animego/core/providers/provider_registry.dart';
 import 'package:animego/core/repositories/provider_anime_repository.dart';
 
 /// Provider palsu untuk menguji fallback registry + envelope repository.
-class _FakeProvider implements AnimeProvider {
+class _FakeProvider extends AnimeProvider {
   _FakeProvider(this.id, this._items, {this.shouldThrow = false});
 
   @override
