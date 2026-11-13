@@ -1,7 +1,7 @@
 import '../dto/anime_dto.dart';
 import 'anime_provider.dart';
 import 'nimegami/nimegami_provider.dart';
-import 'otakudesu_provider/otakudesu_provider.dart';
+import 'otakudesu/otakudesu_provider.dart';
 import 'zoronime/zoronime_provider.dart';
 
 /// Manager/aggregator ("sesuatu" pada diagram).

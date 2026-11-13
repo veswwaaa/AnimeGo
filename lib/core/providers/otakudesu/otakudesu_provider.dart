@@ -4,11 +4,11 @@ import 'package:animego/core/dto/api_envelope.dart';
 import 'package:animego/core/dto/episode_dto.dart';
 import 'package:animego/core/dto/stream_dto.dart';
 import 'package:animego/core/utils/http_client.dart';
-import 'package:animego/core/providers/otakudesu_provider/episodes.dart';
-import 'package:animego/core/providers/otakudesu_provider/parse.dart';
+import 'package:animego/core/providers/otakudesu/episodes.dart';
+import 'package:animego/core/providers/otakudesu/parse.dart';
 // import 'package:animego/core/providers/otakudesu_provider/search.dart';
-import 'package:animego/core/providers/otakudesu_provider/search.dart';
-import 'package:animego/core/providers/otakudesu_provider/video.dart';
+import 'package:animego/core/providers/otakudesu/search.dart';
+import 'package:animego/core/providers/otakudesu/video.dart';
 
 /// Provider Otakudesu (client-side scraper).
 ///

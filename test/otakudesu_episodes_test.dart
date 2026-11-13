@@ -1,5 +1,5 @@
-import 'package:animego/core/providers/otakudesu_provider/episodes.dart';
-import 'package:animego/core/providers/otakudesu_provider/video.dart';
+import 'package:animego/core/providers/otakudesu/episodes.dart';
+import 'package:animego/core/providers/otakudesu/video.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const String _animePageHtml = '''

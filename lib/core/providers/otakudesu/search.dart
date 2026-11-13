@@ -1,5 +1,5 @@
 import 'package:animego/core/utils/utils.dart';
-import 'package:animego/core/providers/otakudesu_provider/parse.dart';
+import 'package:animego/core/providers/otakudesu/parse.dart';
 import 'package:flutter/foundation.dart';
 
 /// Base URL Otakudesu.

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:animego/core/utils/utils.dart';
-import 'package:animego/core/providers/otakudesu_provider/parse.dart';
-import 'package:animego/core/providers/otakudesu_provider/search.dart';
+import 'package:animego/core/providers/otakudesu/parse.dart';
+import 'package:animego/core/providers/otakudesu/search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' as html_parser;
 

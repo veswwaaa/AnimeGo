@@ -1,6 +1,6 @@
 import 'package:animego/core/utils/http_client.dart';
-import 'package:animego/core/providers/otakudesu_provider/parse.dart';
-import 'package:animego/core/providers/otakudesu_provider/search.dart';
+import 'package:animego/core/providers/otakudesu/parse.dart';
+import 'package:animego/core/providers/otakudesu/search.dart';
 import 'package:flutter/foundation.dart';
 
 /// Data layer Otakudesu untuk daftar episode.
