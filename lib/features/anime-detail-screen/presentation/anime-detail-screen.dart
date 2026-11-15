@@ -18,58 +18,134 @@ class AnimeDetailScreen extends StatefulWidget {
   State<AnimeDetailScreen> createState() => _AnimeDetailScreenState();
 }
 
+/// Status pemuatan halaman detail.
+enum _DetailStatus { loading, loaded, error }
+
 class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   late final Anime _anime;
 
   List<EpisodeDto> _episodes = const <EpisodeDto>[];
+  _DetailStatus _status = _DetailStatus.loading;
+  String _errorMessage = '';
   bool _isLoadingEpisodes = false;
 
   @override
   void initState() {
     super.initState();
     _anime = widget.anime;
-    _loadEpisodes();
+    _loadDetail();
   }
 
   /// ID anime komposit: `providerId:localId`.
+  ///
+  /// Mengutamakan [Anime.id] yang sudah diisi dari DTO canonical
+  /// (`provider:localId`). Fallback ke `sourceUrl` hanya untuk model
+  /// yang tidak berasal dari provider canonical (mis. data contoh).
   String get _animeCompositeId {
+    final existing = _anime.id.trim();
+    if (existing.isNotEmpty) {
+      return existing;
+    }
+
     final providerId = _anime.providerId;
     final localId = _anime.sourceUrl.isEmpty ? _anime.title : _anime.sourceUrl;
     return providerId.isEmpty ? localId : providerId + ':' + localId;
   }
 
-  Future<void> _loadEpisodes() async {
+  /// Muat detail + episode.
+  ///
+  /// Detail dan episode dipanggil bersamaan; provider Nimegami v2 sudah
+  /// mengembalikan episode list di payload `/detail`, sehingga panggilan
+  /// `/episodes` dilayani dari cache provider (tanpa round-trip tambahan).
+  Future<void> _loadDetail() async {
     setState(() {
+      _status = _DetailStatus.loading;
+      _errorMessage = '';
       _isLoadingEpisodes = true;
     });
 
+    final repository = ProviderContainer.instance.repository;
+
     try {
-      final envelope = await ProviderContainer.instance.repository.episodes(
-        _animeCompositeId,
-      );
+      // Detail diambil lebih dulu: provider Nimegami v2 mengembalikan
+      // episode list di payload /detail, sehingga panggilan /episodes
+      // berikutnya dilayani dari cache provider (tanpa round-trip tambahan).
+      final detailEnvelope = await repository.detail(_animeCompositeId);
+      final episodesEnvelope = await repository.episodes(_animeCompositeId);
+
       if (!mounted) {
         return;
       }
 
+      final detail = detailEnvelope.data;
+      final episodes = episodesEnvelope.data ?? const <EpisodeDto>[];
+
+      if (detail == null) {
+        setState(() {
+          _status = _DetailStatus.error;
+          _errorMessage =
+              detailEnvelope.error?.message ??
+              'Gagal memuat detail anime. Silakan coba lagi.';
+          _isLoadingEpisodes = false;
+        });
+        return;
+      }
+
       setState(() {
-        _episodes = envelope.data ?? const <EpisodeDto>[];
-        if (_episodes.isNotEmpty) {
-          _anime.episodes = _episodes.length;
+        _applyDetail(detail);
+        _episodes = episodes;
+        if (episodes.isNotEmpty) {
+          _anime.episodes = episodes.length;
         }
+        _status = _DetailStatus.loaded;
+        _isLoadingEpisodes = false;
       });
     } catch (error, stackTrace) {
       logError(
-        'Gagal memuat daftar episode: ' + _anime.title,
+        'Gagal memuat detail anime: ' + _anime.title,
         error,
         stackTrace,
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingEpisodes = false;
-        });
+      if (!mounted) {
+        return;
       }
+      setState(() {
+        _status = _DetailStatus.error;
+        _errorMessage = _messageFor(error);
+        _isLoadingEpisodes = false;
+      });
     }
+  }
+
+  /// Salin metadata detail ke model UI.
+  void _applyDetail(AnimeDto detail) {
+    _anime.title = detail.title;
+    _anime.imageUrl = detail.image ?? _anime.imageUrl;
+    _anime.rating = detail.rating;
+    _anime.genres = detail.genres.isEmpty ? _anime.genres : detail.genres;
+    final description = detail.description;
+    if (description != null && description.trim().isNotEmpty) {
+      _anime.synopsis = description;
+    }
+    if (detail.status.isNotEmpty && detail.status != 'Unknown') {
+      _anime.status = detail.status;
+    }
+    final total = detail.totalEpisodes;
+    if (total != null && total > 0) {
+      _anime.episodes = total;
+    }
+  }
+
+  /// Pesan error yang jelas untuk user (bukan halaman kosong).
+  String _messageFor(Object error) {
+    final text = error.toString();
+    if (text.contains('Tidak bisa menghubungi')) {
+      return 'Tidak bisa menghubungi server. Periksa koneksi internet Anda.';
+    }
+    if (text.contains('terlalu lama merespons')) {
+      return 'Server terlalu lama merespons. Silakan coba lagi.';
+    }
+    return 'Gagal memuat detail anime. Silakan coba lagi.';
   }
 
   Future<void> _openEpisode(EpisodeDto episode) async {
@@ -230,6 +306,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_status == _DetailStatus.error) _buildErrorBanner(),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -338,6 +415,51 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     );
   }
 
+  Widget _buildErrorBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A1416),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFF5A5A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.error_outline, color: Color(0xFFFF5A5A)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _errorMessage.isEmpty
+                      ? 'Gagal memuat detail anime.'
+                      : _errorMessage,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: _loadDetail,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba lagi'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF7A00),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEpisodeList() {
     if (_isLoadingEpisodes) {
       return const Padding(
@@ -347,9 +469,11 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     }
 
     if (_episodes.isEmpty) {
-      return const Text(
-        'Episode belum tersedia',
-        style: TextStyle(color: Colors.grey),
+      return Text(
+        _status == _DetailStatus.loaded
+            ? 'Episode belum tersedia untuk anime ini'
+            : 'Episode belum tersedia',
+        style: const TextStyle(color: Colors.grey),
       );
     }
 

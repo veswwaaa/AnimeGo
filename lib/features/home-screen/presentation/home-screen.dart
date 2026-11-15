@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animego/core/dto/anime_dto.dart';
 import 'package:animego/core/providers/provider_container.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/presentation/anime-detail-screen.dart';
@@ -22,19 +23,48 @@ class _HomeScreenState extends State<HomeScreen> {
     _schedulesFuture = _loadSchedules();
   }
 
+  /// Seed query untuk mengisi beranda.
+  ///
+  /// Kontrak v2 tidak menyediakan endpoint "jadwal rilis", jadi beranda
+  /// diisi dari hasil search provider Nimegami (REST v2).
+  static const List<String> _seedQueries = <String>[
+    'one piece',
+    'naruto',
+    'jujutsu kaisen',
+    'solo leveling',
+    'bleach',
+  ];
+
   Future<List<Anime>> _loadSchedules() async {
     final registry = ProviderContainer.instance.registry;
     final provider = registry['nimegami'];
-    if (provider == null || !provider.supportsSchedules) {
+    if (provider == null || !provider.supportsSearch) {
       return const <Anime>[];
     }
-    try {
-      final dtos = await provider.getSchedules();
-      return dtos.map(animeDtoToModel).toList();
-    } catch (error) {
-      logDev('gagal memuat jadwal: $error', prefix: 'HomeScreen:');
-      return const <Anime>[];
+
+    final seen = <String>{};
+    final results = <Anime>[];
+
+    // Semua seed paralel supaya beranda cepat terisi.
+    final responses = await Future.wait(
+      _seedQueries.map((query) async {
+        try {
+          return await provider.search(query);
+        } catch (error) {
+          logDev('gagal memuat seed "$query": $error', prefix: 'HomeScreen:');
+          return const <AnimeDto>[];
+        }
+      }),
+    );
+
+    for (final dtos in responses) {
+      for (final dto in dtos) {
+        if (!seen.add(dto.id.composite)) continue;
+        results.add(animeDtoToModel(dto));
+      }
     }
+
+    return results;
   }
 
   @override

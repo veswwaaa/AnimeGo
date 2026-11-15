@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:animego/core/providers/provider_registry.dart';
 import 'package:animego/core/repositories/provider_anime_repository.dart';
 
@@ -28,5 +30,11 @@ class ProviderContainer {
   /// Instance global (lazy). Dipakai UI yang tidak punya DI container.
   static ProviderContainer get instance {
     return _instance ??= ProviderContainer.create();
+  }
+
+  /// Mengganti instance global (hanya untuk test).
+  @visibleForTesting
+  static set instance(ProviderContainer container) {
+    _instance = container;
   }
 }

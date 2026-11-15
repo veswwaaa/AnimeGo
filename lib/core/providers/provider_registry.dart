@@ -1,6 +1,6 @@
 import '../dto/anime_dto.dart';
 import 'anime_provider.dart';
-import 'nimegami/nimegami_provider.dart';
+import 'nimegami/nimegami_provider_v2.dart';
 import 'otakudesu/otakudesu_provider.dart';
 import 'zoronime/zoronime_provider.dart';
 
@@ -58,7 +58,7 @@ ProviderRegistry buildDefaultProviderRegistry() {
   return ProviderRegistry(
     providers: <AnimeProvider>[
       const OtakudesuProvider(),
-      NimegamiProvider(),
+      NimegamiProviderV2(),
       ZoronimeProvider(),
     ],
   );

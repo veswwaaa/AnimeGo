@@ -1,6 +1,5 @@
 export 'anime_provider.dart';
-export 'nimegami/nimegami_provider.dart';
-export 'nimegami/nimegami_schedules.dart';
+export 'nimegami/nimegami_provider_v2.dart';
 export 'otakudesu/otakudesu_provider.dart';
 export 'provider_container.dart';
 export 'provider_registry.dart';

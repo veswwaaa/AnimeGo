@@ -4,12 +4,12 @@
 /// dikonversi ke model ini tepat di batas UI. Field [providerId]
 /// memastikan anime dari provider berbeda bisa dibedakan.
 class Anime {
-  final String title;
-  final String imageUrl;
-  final double rating;
-  final List<String> genres;
-  final String synopsis;
-  final String status;
+  String title;
+  String imageUrl;
+  double rating;
+  List<String> genres;
+  String synopsis;
+  String status;
   String sourceUrl;
   String? detailUrl;
   int episodes;

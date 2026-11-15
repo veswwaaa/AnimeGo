@@ -17,5 +17,6 @@ Anime animeDtoToModel(AnimeDto dto) {
     detailUrl: dto.episodeListUrl ?? dto.url,
     episodes: dto.totalEpisodes ?? 0,
     providerId: dto.provider,
+    id: dto.id.composite,
   );
 }
