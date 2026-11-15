@@ -13,10 +13,33 @@ import '../dto/stream_dto.dart';
 import '../dto/api_v2_dto.dart';
 import '../dto/api_envelope.dart';
 
+/// Ambil `localId` dari id komposit backend (`<provider>:<localId>`).
+///
+/// Id dari backend v2 sudah komposit (`nimegami:one-piece`). Kalau id-nya
+/// ternyata bukan format itu (mis. masih URL penuh seperti payload lama),
+/// dipakai apa adanya supaya `AnimeId.parse` tetap aman di sisi consumer.
+String localIdFromApiId(
+  String raw, {
+  required String provider,
+  required String fallback,
+}) {
+  final parsed = AnimeId.parse(raw);
+  if (parsed != null &&
+      parsed.providerId == provider &&
+      parsed.localId.isNotEmpty) {
+    return parsed.localId;
+  }
+  return raw.isNotEmpty ? raw : fallback;
+}
+
 /// Konversi detail canonical v2 -> [AnimeDto].
 AnimeDto animeDtoFromApiDetail(ApiAnimeDetail detail) {
   final provider = detail.provider;
-  final localId = detail.id.isEmpty ? detail.url : detail.id;
+  final localId = localIdFromApiId(
+    detail.id,
+    provider: provider,
+    fallback: detail.url,
+  );
 
   return AnimeDto(
     id: AnimeId(provider, localId),
@@ -40,7 +63,11 @@ AnimeDto animeDtoFromApiDetail(ApiAnimeDetail detail) {
 
 /// Konversi item pencarian canonical v2 -> [AnimeDto].
 AnimeDto animeDtoFromApiSearchItem(ApiSearchItem item) {
-  final localId = item.id.isEmpty ? item.url : item.id;
+  final localId = localIdFromApiId(
+    item.id,
+    provider: item.provider,
+    fallback: item.url,
+  );
 
   return AnimeDto(
     id: AnimeId(item.provider, localId),

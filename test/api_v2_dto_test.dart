@@ -141,4 +141,119 @@ void main() {
       expect(dto.episodeId.composite, 'zoronime:abc#1');
     });
   });
+
+  group('ApiEpisodeDetail (endpoint /episode)', () {
+    test('baca streamUrl, server, dan kualitas dari payload canonical', () {
+      final detail = ApiEpisodeDetail.fromJson({
+        'id': 'nimegami:one-piece#3',
+        'animeId': 'nimegami:one-piece',
+        'provider': 'nimegami',
+        'number': 3,
+        'title': 'Episode 3',
+        'url': 'https://nimegami.id/one-piece/#episode_3',
+        'animeUrl': 'https://nimegami.id/one-piece/',
+        'streamUrl': 'https://cdn.test/master.m3u8',
+        'streamUrl720pdefaultserver': 'https://cdn.test/720.m3u8',
+        'server': [
+          {'name': 'Berkasdrive [KC]', 'mediaId': 'abc', 'quality': '720p'},
+        ],
+        'kualitas': ['360p', '720p'],
+      });
+
+      expect(detail.number, 3);
+      expect(detail.animeUrl, 'https://nimegami.id/one-piece/');
+      expect(detail.streamUrl, 'https://cdn.test/master.m3u8');
+      expect(detail.streamUrl720pdefaultserver, 'https://cdn.test/720.m3u8');
+      expect(detail.server.length, 1);
+      expect(detail.server.first.name, 'Berkasdrive [KC]');
+      expect(detail.server.first.quality, '720p');
+      expect(detail.kualitas, ['360p', '720p']);
+    });
+
+    test('streamUrl null tetap valid (normal, bukan error)', () {
+      final detail = ApiEpisodeDetail.fromJson({
+        'id': 'nimegami:one-piece#1',
+        'animeId': 'nimegami:one-piece',
+        'provider': 'nimegami',
+        'number': 1,
+      });
+
+      expect(detail.streamUrl, isNull);
+      expect(detail.server, isEmpty);
+      expect(detail.kualitas, isEmpty);
+    });
+  });
+
+  group('ApiAnimeDetail episodes', () {
+    test('detail memuat daftar episode dari endpoint /detail', () {
+      final detail = ApiAnimeDetail.fromJson({
+        'id': 'nimegami:one-piece',
+        'provider': 'nimegami',
+        'title': 'One Piece',
+        'url': 'https://nimegami.id/one-piece/',
+        'type': 'SERIES',
+        'episodes': [
+          {
+            'id': 'nimegami:one-piece#1',
+            'animeId': 'nimegami:one-piece',
+            'provider': 'nimegami',
+            'number': 1,
+            'url': 'https://nimegami.id/one-piece/',
+          },
+          {
+            'id': 'nimegami:one-piece#2',
+            'animeId': 'nimegami:one-piece',
+            'provider': 'nimegami',
+            'number': 2,
+            'url': 'https://nimegami.id/one-piece/',
+          },
+        ],
+      });
+
+      expect(detail.type, 'SERIES');
+      expect(detail.episodes.length, 2);
+      expect(detail.episodes.last.number, 2);
+    });
+  });
+
+  group('id komposit backend tidak jadi ganda', () {
+    test('detail dengan id komposit menghasilkan localId yang benar', () {
+      final dto = animeDtoFromApiDetail(
+        const ApiAnimeDetail(
+          id: 'nimegami:one-piece',
+          provider: 'nimegami',
+          title: 'One Piece',
+          url: 'https://nimegami.id/one-piece/',
+        ),
+      );
+
+      expect(dto.id.composite, 'nimegami:one-piece');
+    });
+
+    test('search item dengan id komposit menghasilkan localId yang benar', () {
+      final dto = animeDtoFromApiSearchItem(
+        const ApiSearchItem(
+          id: 'nimegami:naruto',
+          provider: 'nimegami',
+          title: 'Naruto',
+          url: 'https://nimegami.id/naruto/',
+        ),
+      );
+
+      expect(dto.id.composite, 'nimegami:naruto');
+    });
+
+    test('id non-komposit (URL penuh) tetap dipakai apa adanya', () {
+      final dto = animeDtoFromApiDetail(
+        const ApiAnimeDetail(
+          id: 'https://nimegami.id/anime/naruto',
+          provider: 'nimegami',
+          title: 'Naruto',
+          url: 'https://nimegami.id/anime/naruto',
+        ),
+      );
+
+      expect(dto.id.composite, 'nimegami:https://nimegami.id/anime/naruto');
+    });
+  });
 }

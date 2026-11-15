@@ -20,6 +20,7 @@ class ApiErrorCode {
 
   static const String badRequest = 'BAD_REQUEST';
   static const String notFound = 'NOT_FOUND';
+  static const String notSupported = 'NOT_SUPPORTED';
   static const String upstreamError = 'UPSTREAM_ERROR';
   static const String upstreamTimeout = 'UPSTREAM_TIMEOUT';
   static const String parseError = 'PARSE_ERROR';
@@ -70,6 +71,15 @@ class ApiV2Meta {
     this.timestamp,
     this.cacheAgeSeconds,
     this.total,
+    this.page,
+    this.limit,
+    this.totalItems,
+    this.totalPages,
+    this.hasNextPage,
+    this.hasPrevPage,
+    this.nextPage,
+    this.prevPage,
+    this.nextCursor,
     this.extra = const {},
   });
 
@@ -78,16 +88,34 @@ class ApiV2Meta {
   final int? timestamp;
   final int? cacheAgeSeconds;
   final int? total;
+  final int? page;
+  final int? limit;
+  final int? totalItems;
+  final int? totalPages;
+  final bool? hasNextPage;
+  final bool? hasPrevPage;
+  final int? nextPage;
+  final int? prevPage;
+  final String? nextCursor;
   final Map<String, dynamic> extra;
 
   factory ApiV2Meta.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const ApiV2Meta();
-    final known = <String>{
+    const known = <String>{
       'provider',
       'contractVersion',
       'timestamp',
       'cacheAgeSeconds',
       'total',
+      'page',
+      'limit',
+      'totalItems',
+      'totalPages',
+      'hasNextPage',
+      'hasPrevPage',
+      'nextPage',
+      'prevPage',
+      'nextCursor',
     };
     return ApiV2Meta(
       provider: json['provider']?.toString(),
@@ -95,6 +123,19 @@ class ApiV2Meta {
       timestamp: _asInt(json['timestamp']),
       cacheAgeSeconds: _asInt(json['cacheAgeSeconds']),
       total: _asInt(json['total']),
+      page: _asInt(json['page']),
+      limit: _asInt(json['limit']),
+      totalItems: _asInt(json['totalItems']),
+      totalPages: _asInt(json['totalPages']),
+      hasNextPage: json['hasNextPage'] is bool
+          ? json['hasNextPage'] as bool
+          : null,
+      hasPrevPage: json['hasPrevPage'] is bool
+          ? json['hasPrevPage'] as bool
+          : null,
+      nextPage: _asInt(json['nextPage']),
+      prevPage: _asInt(json['prevPage']),
+      nextCursor: _asString(json['nextCursor']),
       extra: {
         for (final entry in json.entries)
           if (!known.contains(entry.key)) entry.key: entry.value,
@@ -108,6 +149,15 @@ class ApiV2Meta {
     if (timestamp != null) 'timestamp': timestamp,
     if (cacheAgeSeconds != null) 'cacheAgeSeconds': cacheAgeSeconds,
     if (total != null) 'total': total,
+    if (page != null) 'page': page,
+    if (limit != null) 'limit': limit,
+    if (totalItems != null) 'totalItems': totalItems,
+    if (totalPages != null) 'totalPages': totalPages,
+    if (hasNextPage != null) 'hasNextPage': hasNextPage,
+    if (hasPrevPage != null) 'hasPrevPage': hasPrevPage,
+    if (nextPage != null) 'nextPage': nextPage,
+    if (prevPage != null) 'prevPage': prevPage,
+    if (nextCursor != null) 'nextCursor': nextCursor,
     ...extra,
   };
 }
@@ -127,7 +177,6 @@ class ApiV2Envelope<T> {
   final ApiV2Error? error;
 
   bool get isSuccess => success && error == null && data != null;
-
 }
 
 /// Parse envelope generik dengan decoder per tipe data.
@@ -195,6 +244,7 @@ class ApiSearchItem {
     this.description,
     this.genres = const [],
     this.status,
+    this.type,
     this.rating,
     this.year,
     this.totalEpisodes,
@@ -208,6 +258,7 @@ class ApiSearchItem {
   final String? description;
   final List<String> genres;
   final String? status;
+  final String? type;
   final double? rating;
   final int? year;
   final int? totalEpisodes;
@@ -222,6 +273,7 @@ class ApiSearchItem {
       description: _asString(json['description']),
       genres: _asStringList(json['genres']),
       status: _asString(json['status']),
+      type: _asString(json['type']),
       rating: _asDouble(json['rating']),
       year: _asInt(json['year']),
       totalEpisodes: _asInt(json['totalEpisodes']),
@@ -237,6 +289,7 @@ class ApiSearchItem {
     'description': description,
     'genres': genres,
     'status': status,
+    'type': type,
     'rating': rating,
     'year': year,
     'totalEpisodes': totalEpisodes,
@@ -280,11 +333,13 @@ class ApiAnimeDetail {
     this.description,
     this.genres = const [],
     this.status,
+    this.type,
     this.rating,
     this.year,
     this.totalEpisodes,
     required this.url,
     this.episodeListUrl,
+    this.episodes = const [],
     this.extra = const {},
   });
 
@@ -296,15 +351,20 @@ class ApiAnimeDetail {
   final String? description;
   final List<String> genres;
   final String? status;
+  final String? type;
   final double? rating;
   final int? year;
   final int? totalEpisodes;
   final String url;
   final String? episodeListUrl;
+
+  /// Daftar episode (isi endpoint `/detail` dengan `includeEpisodes=true`).
+  final List<ApiEpisode> episodes;
   final Map<String, dynamic> extra;
 
   factory ApiAnimeDetail.fromJson(Map<String, dynamic> json) {
     final rawExtra = json['extra'];
+    final rawEpisodes = json['episodes'];
     return ApiAnimeDetail(
       id: json['id']?.toString() ?? '',
       provider: json['provider']?.toString() ?? '',
@@ -314,11 +374,18 @@ class ApiAnimeDetail {
       description: _asString(json['description']),
       genres: _asStringList(json['genres']),
       status: _asString(json['status']),
+      type: _asString(json['type']),
       rating: _asDouble(json['rating']),
       year: _asInt(json['year']),
       totalEpisodes: _asInt(json['totalEpisodes']),
       url: json['url']?.toString() ?? '',
       episodeListUrl: _asString(json['episodeListUrl']),
+      episodes: rawEpisodes is List
+          ? rawEpisodes
+                .whereType<Map<String, dynamic>>()
+                .map(ApiEpisode.fromJson)
+                .toList(growable: false)
+          : const <ApiEpisode>[],
       extra: rawExtra is Map<String, dynamic> ? rawExtra : const {},
     );
   }
@@ -332,11 +399,13 @@ class ApiAnimeDetail {
     'description': description,
     'genres': genres,
     'status': status,
+    'type': type,
     'rating': rating,
     'year': year,
     'totalEpisodes': totalEpisodes,
     'url': url,
     'episodeListUrl': episodeListUrl,
+    'episodes': episodes.map((episode) => episode.toJson()).toList(),
     'extra': extra,
   };
 }
@@ -385,6 +454,115 @@ class ApiEpisode {
     'title': title,
     'url': url,
     'airingDate': airingDate,
+    'extra': extra,
+  };
+}
+
+/// Satu server streaming untuk sebuah episode (additive, nullable-safe).
+class ApiEpisodeServer {
+  const ApiEpisodeServer({required this.name, this.mediaId, this.quality});
+
+  final String name;
+  final String? mediaId;
+  final String? quality;
+
+  factory ApiEpisodeServer.fromJson(Map<String, dynamic> json) {
+    return ApiEpisodeServer(
+      name: json['name']?.toString() ?? '',
+      mediaId: _asString(json['mediaId']),
+      quality: _asString(json['quality']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'mediaId': mediaId,
+    'quality': quality,
+  };
+}
+
+/// Detail SATU episode (metadata episode + stream) dalam satu envelope.
+///
+/// `streamUrl` NULL itu NORMAL (mirror/embed gagal diambil), bukan error.
+class ApiEpisodeDetail {
+  const ApiEpisodeDetail({
+    required this.id,
+    required this.animeId,
+    required this.provider,
+    required this.number,
+    this.title,
+    this.url,
+    this.airingDate,
+    this.animeUrl,
+    this.streamUrl,
+    this.streamUrl720pdefaultserver,
+    this.server = const [],
+    this.kualitas = const [],
+    this.extra = const {},
+  });
+
+  final String id;
+  final String animeId;
+  final String provider;
+  final int number;
+  final String? title;
+  final String? url;
+  final String? airingDate;
+
+  /// URL halaman anime induk.
+  final String? animeUrl;
+
+  /// URL stream siap main (nullable = normal).
+  final String? streamUrl;
+
+  /// URL stream kualitas 720p + server default (nullable).
+  final String? streamUrl720pdefaultserver;
+
+  /// Daftar server streaming untuk episode ini.
+  final List<ApiEpisodeServer> server;
+
+  /// Daftar resolusi yang tersedia, mis. ["360p","720p"].
+  final List<String> kualitas;
+  final Map<String, dynamic> extra;
+
+  factory ApiEpisodeDetail.fromJson(Map<String, dynamic> json) {
+    final rawExtra = json['extra'];
+    final rawServer = json['server'];
+    return ApiEpisodeDetail(
+      id: json['id']?.toString() ?? '',
+      animeId: json['animeId']?.toString() ?? '',
+      provider: json['provider']?.toString() ?? '',
+      number: _asInt(json['number']) ?? 0,
+      title: _asString(json['title']),
+      url: _asString(json['url']),
+      airingDate: _asString(json['airingDate']),
+      animeUrl: _asString(json['animeUrl']),
+      streamUrl: _asString(json['streamUrl']),
+      streamUrl720pdefaultserver: _asString(json['streamUrl720pdefaultserver']),
+      server: rawServer is List
+          ? rawServer
+                .whereType<Map<String, dynamic>>()
+                .map(ApiEpisodeServer.fromJson)
+                .toList(growable: false)
+          : const <ApiEpisodeServer>[],
+      kualitas: _asStringList(json['kualitas']),
+      extra: rawExtra is Map<String, dynamic> ? rawExtra : const {},
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'animeId': animeId,
+    'provider': provider,
+    'number': number,
+    'title': title,
+    'url': url,
+    'airingDate': airingDate,
+    'animeUrl': animeUrl,
+    'streamUrl': streamUrl,
+    'streamUrl720pdefaultserver': streamUrl720pdefaultserver,
+    'server': server.map((item) => item.toJson()).toList(),
+    'kualitas': kualitas,
     'extra': extra,
   };
 }
