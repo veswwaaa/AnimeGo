@@ -495,7 +495,9 @@ class ApiEpisodeDetail {
     this.airingDate,
     this.animeUrl,
     this.streamUrl,
-    this.streamUrl720pdefaultserver,
+    this.streamUrlDefaultServer,
+    this.defaultQuality,
+    this.defaultServerName,
     this.server = const [],
     this.kualitas = const [],
     this.extra = const {},
@@ -515,8 +517,14 @@ class ApiEpisodeDetail {
   /// URL stream siap main (nullable = normal).
   final String? streamUrl;
 
-  /// URL stream kualitas 720p + server default (nullable).
-  final String? streamUrl720pdefaultserver;
+  /// URL stream dari server default (dipakai untuk playback utama).
+  final String? streamUrlDefaultServer;
+
+  /// Kualitas default dari server yang dipilih backend (nullable).
+  final String? defaultQuality;
+
+  /// Nama server default dari backend (nullable).
+  final String? defaultServerName;
 
   /// Daftar server streaming untuk episode ini.
   final List<ApiEpisodeServer> server;
@@ -538,7 +546,10 @@ class ApiEpisodeDetail {
       airingDate: _asString(json['airingDate']),
       animeUrl: _asString(json['animeUrl']),
       streamUrl: _asString(json['streamUrl']),
-      streamUrl720pdefaultserver: _asString(json['streamUrl720pdefaultserver']),
+      streamUrlDefaultServer: _asString(json['streamUrlDefaultServer']) ??
+          _asString(json['streamUrl720pdefaultserver']),
+      defaultQuality: _asString(json['defaultQuality']),
+      defaultServerName: _asString(json['defaultServerName']),
       server: rawServer is List
           ? rawServer
                 .whereType<Map<String, dynamic>>()
@@ -560,7 +571,9 @@ class ApiEpisodeDetail {
     'airingDate': airingDate,
     'animeUrl': animeUrl,
     'streamUrl': streamUrl,
-    'streamUrl720pdefaultserver': streamUrl720pdefaultserver,
+    'streamUrlDefaultServer': streamUrlDefaultServer,
+    'defaultQuality': defaultQuality,
+    'defaultServerName': defaultServerName,
     'server': server.map((item) => item.toJson()).toList(),
     'kualitas': kualitas,
     'extra': extra,

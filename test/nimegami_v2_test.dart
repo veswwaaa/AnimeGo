@@ -156,6 +156,124 @@ void main() {
       expect(results.single.id.localId, 'stone-ocean');
     });
 
+    test('stream memakai streamUrlDefaultServer sebagai URL utama', () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode(<String, dynamic>{
+            'success': true,
+            'data': <String, dynamic>{
+              'id': 'nimegami:stone-ocean#1',
+              'animeId': 'nimegami:stone-ocean',
+              'provider': 'nimegami',
+              'number': 1,
+              'streamUrl': 'https://cdn.test/master.m3u8',
+              'streamUrlDefaultServer': 'https://cdn.test/default.m3u8',
+              'defaultQuality': '720p',
+              'defaultServerName': 'Berkasdrive [KC]',
+              'server': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'name': 'Berkasdrive [KC]',
+                  'mediaId': 'abc',
+                  'quality': '720p',
+                },
+              ],
+            },
+            'meta': <String, dynamic>{},
+            'error': null,
+          }),
+          200,
+          headers: <String, String>{'content-type': 'application/json'},
+        ),
+      );
+
+      final provider = NimegamiProviderV2(client: client);
+      final stream = await provider.getStreamUrl(
+        EpisodeDto(
+          id: const AnimeId('nimegami', 'stone-ocean#1'),
+          animeId: const AnimeId('nimegami', 'stone-ocean'),
+          number: 1,
+          url: 'https://nimegami.id/stone-ocean-sub-indo/',
+        ),
+      );
+
+      expect(stream.url, 'https://cdn.test/default.m3u8');
+      expect(stream.type, 'hls');
+    });
+
+    test('stream fallback ke streamUrl bila default server kosong', () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode(<String, dynamic>{
+            'success': true,
+            'data': <String, dynamic>{
+              'id': 'nimegami:stone-ocean#1',
+              'animeId': 'nimegami:stone-ocean',
+              'provider': 'nimegami',
+              'number': 1,
+              'streamUrl': 'https://cdn.test/master.mp4',
+            },
+            'meta': <String, dynamic>{},
+            'error': null,
+          }),
+          200,
+          headers: <String, String>{'content-type': 'application/json'},
+        ),
+      );
+
+      final provider = NimegamiProviderV2(client: client);
+      final stream = await provider.getStreamUrl(
+        EpisodeDto(
+          id: const AnimeId('nimegami', 'stone-ocean#1'),
+          animeId: const AnimeId('nimegami', 'stone-ocean'),
+          number: 1,
+          url: 'https://nimegami.id/stone-ocean-sub-indo/',
+        ),
+      );
+
+      expect(stream.url, 'https://cdn.test/master.mp4');
+      expect(stream.type, 'direct');
+    });
+
+    test('stream tanpa URL menghasilkan exception terkontrol', () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode(<String, dynamic>{
+            'success': true,
+            'data': <String, dynamic>{
+              'id': 'nimegami:stone-ocean#1',
+              'animeId': 'nimegami:stone-ocean',
+              'provider': 'nimegami',
+              'number': 1,
+            },
+            'meta': <String, dynamic>{},
+            'error': null,
+          }),
+          200,
+          headers: <String, String>{'content-type': 'application/json'},
+        ),
+      );
+
+      final provider = NimegamiProviderV2(client: client);
+
+      await expectLater(
+        provider.getStreamUrl(
+          EpisodeDto(
+            id: const AnimeId('nimegami', 'stone-ocean#1'),
+            animeId: const AnimeId('nimegami', 'stone-ocean'),
+            number: 1,
+            url: 'https://nimegami.id/stone-ocean-sub-indo/',
+          ),
+        ),
+        throwsA(
+          isA<Object>().having(
+            (Object e) => e.toString(),
+            'message',
+            contains('Stream tidak tersedia'),
+          ),
+        ),
+      );
+    });
+
     test('error 404 dari server diterjemahkan jadi pesan eksplisit', () async {
       final client = MockClient(
         (request) async => http.Response(

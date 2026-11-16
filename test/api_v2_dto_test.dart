@@ -153,7 +153,9 @@ void main() {
         'url': 'https://nimegami.id/one-piece/#episode_3',
         'animeUrl': 'https://nimegami.id/one-piece/',
         'streamUrl': 'https://cdn.test/master.m3u8',
-        'streamUrl720pdefaultserver': 'https://cdn.test/720.m3u8',
+        'streamUrlDefaultServer': 'https://cdn.test/720.m3u8',
+        'defaultQuality': '720p',
+        'defaultServerName': 'Berkasdrive [KC]',
         'server': [
           {'name': 'Berkasdrive [KC]', 'mediaId': 'abc', 'quality': '720p'},
         ],
@@ -163,11 +165,25 @@ void main() {
       expect(detail.number, 3);
       expect(detail.animeUrl, 'https://nimegami.id/one-piece/');
       expect(detail.streamUrl, 'https://cdn.test/master.m3u8');
-      expect(detail.streamUrl720pdefaultserver, 'https://cdn.test/720.m3u8');
+      expect(detail.streamUrlDefaultServer, 'https://cdn.test/720.m3u8');
+      expect(detail.defaultQuality, '720p');
+      expect(detail.defaultServerName, 'Berkasdrive [KC]');
       expect(detail.server.length, 1);
       expect(detail.server.first.name, 'Berkasdrive [KC]');
       expect(detail.server.first.quality, '720p');
       expect(detail.kualitas, ['360p', '720p']);
+    });
+
+    test('backward compatible: key lama streamUrl720pdefaultserver tetap dibaca', () {
+      final detail = ApiEpisodeDetail.fromJson(<String, dynamic>{
+        'id': 'nimegami:one-piece#1',
+        'animeId': 'nimegami:one-piece',
+        'provider': 'nimegami',
+        'number': 1,
+        'streamUrl720pdefaultserver': 'https://cdn.test/legacy.m3u8',
+      });
+
+      expect(detail.streamUrlDefaultServer, 'https://cdn.test/legacy.m3u8');
     });
 
     test('streamUrl null tetap valid (normal, bukan error)', () {

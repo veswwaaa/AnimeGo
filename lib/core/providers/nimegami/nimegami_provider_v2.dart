@@ -228,9 +228,9 @@ class NimegamiProviderV2 extends RestProviderBase {
       );
     }
 
-    // Fallback berurutan: streamUrl -> streamUrl720pdefaultserver.
-    final primary = (detail.streamUrl ?? '').trim();
-    final fallback = (detail.streamUrl720pdefaultserver ?? '').trim();
+    // Fallback berurutan: streamUrlDefaultServer -> streamUrl.
+    final primary = (detail.streamUrlDefaultServer ?? '').trim();
+    final fallback = (detail.streamUrl ?? '').trim();
     final resolvedUrl = primary.isNotEmpty
         ? primary
         : (fallback.isNotEmpty ? fallback : '');
@@ -243,12 +243,18 @@ class NimegamiProviderV2 extends RestProviderBase {
       );
     }
 
+    final defaultLabel = (detail.defaultServerName ?? '').trim();
+    final defaultQuality = (detail.defaultQuality ?? '').trim();
     final mirrors = detail.server
         .map(
           (server) => StreamMirror(
             url: resolvedUrl,
-            label: server.name.isEmpty ? null : server.name,
-            quality: server.quality,
+            label: server.name.isNotEmpty
+                ? server.name
+                : (defaultLabel.isNotEmpty ? defaultLabel : null),
+            quality: (server.quality ?? '').isNotEmpty
+                ? server.quality
+                : (defaultQuality.isNotEmpty ? defaultQuality : null),
           ),
         )
         .toList(growable: false);
