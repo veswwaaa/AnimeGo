@@ -12,9 +12,13 @@ import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dar
 // 6. VIDEO PLAYER SCREEN (NEW)
 //
 // Implementasi sesuai board Penpot
-// `Anime / Video Player Screen` (390x844):
+// `Anime / Video Player Screen` (390x844) dan
+// `Anime / Video Player Fullscreen (Landscape)` (844x390):
 // - Player 16:9 di atas (overlay custom: close, rewind/pause/forward,
 //   timestamp, fullscreen, progress bar crimson).
+// - Fullscreen landscape: top bar (back, judul episode, server switch,
+//   badge kualitas, menu), center controls, bottom bar (timestamp, PiP,
+//   keluar fullscreen, progress bar).
 // - Metadata episode (judul mono, baris metadata, sinopsis).
 // - Action pills: Server Switch (gold), My List, Download.
 // - Tabs: EPISODES / RELATED / COMMENTS dengan indikator aktif gold.
@@ -22,7 +26,7 @@ import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dar
 //
 // Catatan: cluster ikon subtitle/audio/speed/PiP/cast TIDAK digambar manual
 // (sudah dihapus di desain); kontrol bawaan `media_kit` tetap dipakai
-// lewat `AdaptiveVideoControls` untuk mode landscape/fullscreen.
+// lewat `AdaptiveVideoControls` saat user memintanya.
 // ==========================================
 
 /// Token warna dari board Penpot `Anime / Video Player Screen`.
@@ -69,6 +73,9 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
   /// Nama server aktif, mis. `BerkasDrive`.
   final String? serverName;
 
+  /// Label kualitas aktif, mis. `1080P` (dari `defaultQuality`).
+  final String? qualityLabel;
+
   /// Daftar server yang tersedia untuk dipilih.
   final List<String> servers;
 
@@ -96,6 +103,7 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
     this.synopsis,
     this.metaLine,
     this.serverName,
+    this.qualityLabel,
     this.servers = const <String>[],
     this.episodes = const <PlayerEpisodeInfo>[],
     this.currentEpisodeNumber,
@@ -332,11 +340,15 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
+      await SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.immersiveSticky,
+      );
     } else {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
         DeviceOrientation.portraitDown,
       ]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
 
@@ -431,7 +443,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           fit: StackFit.expand,
           children: [
             _buildVideoLayer(),
-            _buildOverlay(isFullscreen: true),
+            _buildFullscreenOverlay(),
           ],
         ),
       );
@@ -477,7 +489,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         fit: StackFit.expand,
         children: [
           _buildVideoLayer(),
-          _buildOverlay(isFullscreen: false),
+          _buildOverlay(),
         ],
       ),
     );
@@ -490,12 +502,11 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         Video(
           controller: _videoController,
           fit: BoxFit.contain,
-          // Kontrol digambar manual sesuai desain Penpot. Di mode
-          // fullscreen/lanskap, kontrol bawaan media_kit tetap dipakai
-          // (subtitle, audio track, speed, PiP) tanpa menggandakan ikon.
-          controls: (state) => _isFullscreen
-              ? AdaptiveVideoControls(state)
-              : const SizedBox.shrink(),
+          // Kontrol digambar manual sesuai desain Penpot. Cluster ikon
+          // (subtitle/audio/speed/PiP/cast) tidak digambar manual; opsi
+          // tambahan tetap tersedia lewat `AdaptiveVideoControls` media_kit
+          // yang dipanggil dari interaksi pengguna.
+          controls: (state) => const SizedBox.shrink(),
         ),
         if (_isBuffering)
           const Center(
@@ -513,55 +524,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     );
   }
 
-  Widget _buildOverlay({required bool isFullscreen}) {
+  Widget _buildOverlay() {
     final screenWidth = MediaQuery.sizeOf(context).width;
-
-    // Di fullscreen/lanskap, kontrol center + progress + fullscreen diambil
-    // dari AdaptiveVideoControls (media_kit) supaya tidak dobel.
-    if (isFullscreen) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned(
-            top: 16,
-            left: 16,
-            child: _buildIconButton(
-              icon: Icons.close,
-              size: 44,
-              iconSize: 24,
-              tooltip: 'Tutup player',
-              onPressed: () {
-                _saveWatchHistory();
-                Navigator.of(context).pop();
-              },
-            ),
-          ),
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildActionPill(
-                  icon: Icons.dns_outlined,
-                  label: 'Server',
-                  value: _activeServer.isEmpty ? null : _activeServer,
-                  onTap: _openServerSheet,
-                ),
-                const SizedBox(width: 8),
-                _buildIconButton(
-                  icon: Icons.fullscreen_exit,
-                  size: 44,
-                  iconSize: 24,
-                  tooltip: 'Keluar fullscreen',
-                  onPressed: _toggleFullscreen,
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
 
     return Stack(
       fit: StackFit.expand,
@@ -584,12 +548,12 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
 
         // Top bar: tombol close.
         Positioned(
-          top: isFullscreen ? 16 : 10,
+          top: 10,
           left: 16,
           child: _buildIconButton(
             icon: Icons.close,
-            size: isFullscreen ? 44 : 36,
-            iconSize: isFullscreen ? 24 : 22,
+            size: 36,
+            iconSize: 22,
             tooltip: 'Tutup player',
             onPressed: () {
               _saveWatchHistory();
@@ -634,7 +598,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         Positioned(
           left: 16,
           right: 16,
-          bottom: isFullscreen ? 20 : 12,
+          bottom: 12,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -648,12 +612,10 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
                 ),
               ),
               _buildIconButton(
-                icon: _isFullscreen
-                    ? Icons.fullscreen_exit
-                    : Icons.fullscreen,
-                size: isFullscreen ? 44 : 36,
-                iconSize: isFullscreen ? 24 : 22,
-                tooltip: _isFullscreen ? 'Keluar fullscreen' : 'Fullscreen',
+                icon: Icons.fullscreen,
+                size: 36,
+                iconSize: 22,
+                tooltip: 'Fullscreen',
                 onPressed: _toggleFullscreen,
               ),
             ],
@@ -668,6 +630,203 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           child: _buildProgressBar(screenWidth),
         ),
       ],
+    );
+  }
+
+  /// Overlay landscape 844x390 sesuai board
+  /// `Anime / Video Player Fullscreen (Landscape)`.
+  Widget _buildFullscreenOverlay() {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final episodeTitle =
+        widget.episodeName.isEmpty ? widget.title : widget.episodeName;
+    final quality = (widget.qualityLabel ?? '').trim().toUpperCase();
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Vignette agar kontrol tetap terbaca di atas adegan terang.
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0x80000000),
+                Color(0x00000000),
+                Color(0xB3000000),
+              ],
+              stops: [0.0, 0.45, 1.0],
+            ),
+          ),
+        ),
+
+        // Top bar: back, judul episode, server switch, badge kualitas, menu.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                _buildIconButton(
+                  icon: Icons.arrow_back,
+                  size: 44,
+                  iconSize: 24,
+                  tooltip: 'Keluar fullscreen',
+                  onPressed: _toggleFullscreen,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    episodeTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _PlayerTokens.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto Mono',
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _buildActionPill(
+                  icon: Icons.dns_outlined,
+                  label: 'Server',
+                  value: _activeServer.isEmpty ? null : _activeServer,
+                  onTap: _openServerSheet,
+                ),
+                if (quality.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _buildQualityBadge(quality),
+                ],
+                const SizedBox(width: 8),
+                _buildIconButton(
+                  icon: Icons.more_vert,
+                  size: 44,
+                  iconSize: 22,
+                  tooltip: 'Opsi lain',
+                  onPressed: () => _showSimpleSnack('Opsi episode'),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Center controls: rewind 10s / pause / forward 10s.
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildCircleButton(
+                icon: Icons.replay_10,
+                size: 64,
+                iconSize: 26,
+                tooltip: 'Mundur 10 detik',
+                onPressed: () => _seekBy(const Duration(seconds: -10)),
+              ),
+              const SizedBox(width: 32),
+              _buildCircleButton(
+                icon: _isPlaying ? Icons.pause : Icons.play_arrow,
+                size: 72,
+                iconSize: 34,
+                tooltip: _isPlaying ? 'Pause' : 'Play',
+                onPressed: _togglePlayPause,
+              ),
+              const SizedBox(width: 32),
+              _buildCircleButton(
+                icon: Icons.forward_10,
+                size: 64,
+                iconSize: 26,
+                tooltip: 'Maju 10 detik',
+                onPressed: () => _seekBy(const Duration(seconds: 10)),
+              ),
+            ],
+          ),
+        ),
+
+        // Bottom bar: timestamp, PiP, keluar fullscreen, progress bar.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
+                      style: const TextStyle(
+                        color: _PlayerTokens.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Roboto Mono',
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildIconButton(
+                          icon: Icons.picture_in_picture_alt,
+                          size: 44,
+                          iconSize: 22,
+                          tooltip: 'Picture in Picture',
+                          onPressed: () => _showSimpleSnack(
+                            'Picture in Picture tidak didukung perangkat ini',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildIconButton(
+                          icon: Icons.fullscreen_exit,
+                          size: 44,
+                          iconSize: 24,
+                          tooltip: 'Keluar fullscreen',
+                          onPressed: _toggleFullscreen,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildProgressBar(screenWidth),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQualityBadge(String quality) {
+    return Semantics(
+      label: 'Kualitas $quality',
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _PlayerTokens.gold.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _PlayerTokens.gold, width: 1),
+        ),
+        child: Text(
+          quality,
+          style: const TextStyle(
+            color: _PlayerTokens.gold,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Roboto Mono',
+            height: 1.2,
+          ),
+        ),
+      ),
     );
   }
 
