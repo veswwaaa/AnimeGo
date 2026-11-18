@@ -8,4 +8,4 @@
 6. MyAnimeList data is used in accordance with the MyAnimeList API Terms of Use.
 7. We may modify or discontinue the App at any time.
 
-Contact: [email]
+Contact: [kevinapta99@gmail.com]
