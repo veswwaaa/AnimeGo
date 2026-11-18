@@ -45,6 +45,8 @@ dependencies:
   html: ^0.15.6
   dio_cookie_manager: ^3.4.0
   cookie_jar: ^4.0.9
+  flutter_web_auth_2: ^5.1.0
+  flutter_secure_storage: ^11.2.0
   
 
 dev_dependencies:

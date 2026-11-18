@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:animego/features/auth/presentation/mal-login-section.dart';
 import 'package:animego/features/developer-screen/presentation/developer-screen.dart';
 
 // ==========================================
@@ -10,7 +12,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
@@ -38,8 +40,9 @@ class ProfileScreen extends StatelessWidget {
               'anime.fan@anistream.app',
               style: TextStyle(color: Colors.grey),
             ),
-            const SizedBox(height: 40),
-
+            const SizedBox(height: 24),
+            const MalLoginSection(),
+            const SizedBox(height: 24),
             _buildProfileMenu(
               Icons.settings_outlined,
               'Settings',

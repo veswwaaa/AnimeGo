@@ -1,8 +1,33 @@
 import 'package:flutter/material.dart';
+
+import 'package:animego/core/auth/mal_auth_provider.dart';
+import 'package:animego/core/auth/mal_auth_scope.dart';
+import 'package:animego/core/auth/mal_di.dart';
 import 'package:animego/features/main-navigation/presentation/main-navigation.dart';
 
-class AniStreamApp extends StatelessWidget {
+class AniStreamApp extends StatefulWidget {
   const AniStreamApp({super.key});
+
+  @override
+  State<AniStreamApp> createState() => _AniStreamAppState();
+}
+
+class _AniStreamAppState extends State<AniStreamApp> {
+  late final MalAuthProvider _malAuth;
+
+  @override
+  void initState() {
+    super.initState();
+    _malAuth = MalDi.provider();
+    // Restore session MAL dari secure storage saat app dibuka.
+    _malAuth.restore();
+  }
+
+  @override
+  void dispose() {
+    _malAuth.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +45,10 @@ class AniStreamApp extends StatelessWidget {
         ),
         fontFamily: 'Roboto',
       ),
-      home: const MainNavigationScreen(),
+      home: MalAuthScope(
+        provider: _malAuth,
+        child: const MainNavigationScreen(),
+      ),
     );
   }
 }
