@@ -148,6 +148,38 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     return 'Gagal memuat detail anime. Silakan coba lagi.';
   }
 
+  /// Baris metadata ringkas untuk player, mis.
+  /// `Season 1 • Sub | Dub • 24m • 2024`.
+  String get _playerMetaLine {
+    final parts = <String>[];
+    if (_anime.status.isNotEmpty && _anime.status != 'Unknown') {
+      parts.add(_anime.status);
+    }
+    if (_anime.rating > 0) {
+      parts.add('★ ' + _anime.rating.toStringAsFixed(1));
+    }
+    final total = _anime.episodes;
+    if (total > 0) {
+      parts.add(total.toString() + ' Episode');
+    }
+    return parts.join(' • ');
+  }
+
+  /// Daftar episode siap pakai untuk section `EPISODES` di player.
+  List<PlayerEpisodeInfo> get _playerEpisodes {
+    return _episodes
+        .map(
+          (episode) => PlayerEpisodeInfo(
+            number: episode.number,
+            title:
+                episode.title ?? ('Episode ' + episode.number.toString()),
+            subtitle:
+                episode.airingDate ?? _anime.providerId,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> _openEpisode(EpisodeDto episode) async {
     final episodeLabel =
         episode.title ?? ('Episode ' + episode.number.toString());
@@ -171,7 +203,19 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
 
     logDev('Episode URL: ' + stream.url, prefix: 'AnimeDetail:');
 
-    Navigator.push(
+    // Nama server aktif + daftar server dari mirror stream.
+    final serverLabels = <String>[];
+    for (final mirror in stream.mirrors) {
+      final label = (mirror.label ?? '').trim();
+      if (label.isNotEmpty && !serverLabels.contains(label)) {
+        serverLabels.add(label);
+      }
+    }
+    final activeServer = serverLabels.isNotEmpty
+        ? serverLabels.first
+        : (stream.mirrors.isEmpty ? null : stream.mirrors.first.label);
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => AnimeVideoPlayerScreen(
@@ -179,6 +223,103 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           animeImageUrl: _anime.imageUrl,
           episodeName: episodeLabel,
           videoUrl: stream.url,
+          synopsis: _anime.synopsis,
+          metaLine: _playerMetaLine,
+          serverName: activeServer,
+          servers: serverLabels,
+          episodes: _playerEpisodes,
+          currentEpisodeNumber: episode.number,
+          onServerSelected: (serverName) => _resolveServerStream(
+            episode,
+            serverName,
+          ),
+          onEpisodeSelected: (info) => _switchEpisode(episode, info),
+        ),
+      ),
+    );
+  }
+
+  /// Ambil ulang stream episode (dipakai saat user ganti server).
+  Future<String?> _resolveServerStream(
+    EpisodeDto episode,
+    String serverName,
+  ) async {
+    try {
+      final envelope = await ProviderContainer.instance.repository.stream(
+        episode.id.composite,
+      );
+      final url = envelope.data?.url;
+      if (url == null || url.isEmpty) {
+        if (!mounted) return null;
+        showErrorSnackBar(
+          context,
+          'Server ' + serverName + ' tidak tersedia untuk episode ini.',
+        );
+        return null;
+      }
+      return url;
+    } catch (error) {
+      logError(
+        'Gagal mengganti server: $serverName',
+        error,
+        StackTrace.current,
+      );
+      if (!mounted) return null;
+      showErrorSnackBar(context, 'Gagal memuat server ' + serverName + '.');
+      return null;
+    }
+  }
+
+  /// Pindah ke episode lain langsung dari daftar di player.
+  Future<void> _switchEpisode(
+    EpisodeDto currentEpisode,
+    PlayerEpisodeInfo info,
+  ) async {
+    if (info.number == currentEpisode.number) {
+      return;
+    }
+
+    final target = _episodes.where((item) => item.number == info.number);
+    if (target.isEmpty) {
+      return;
+    }
+
+    final episode = target.first;
+    showErrorSnackBar(context, 'Memuat episode ' + info.title + '...');
+
+    final envelope = await ProviderContainer.instance.repository.stream(
+      episode.id.composite,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    final stream = envelope.data;
+    if (stream == null || stream.url.isEmpty) {
+      showErrorSnackBar(
+        context,
+        envelope.error?.message ?? 'Gagal memuat episode. Silakan coba lagi.',
+      );
+      return;
+    }
+
+    await Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnimeVideoPlayerScreen(
+          title: _anime.title,
+          animeImageUrl: _anime.imageUrl,
+          episodeName: info.title,
+          videoUrl: stream.url,
+          synopsis: _anime.synopsis,
+          metaLine: _playerMetaLine,
+          serverName: stream.mirrors.isEmpty ? null : stream.mirrors.first.label,
+          servers: stream.mirrors
+              .map((mirror) => mirror.label ?? '')
+              .where((label) => label.isNotEmpty)
+              .toList(growable: false),
+          episodes: _playerEpisodes,
+          currentEpisodeNumber: episode.number,
         ),
       ),
     );
