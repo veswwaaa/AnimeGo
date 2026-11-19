@@ -143,6 +143,11 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   String _activeServer = '';
   String? _selectedTab;
 
+  // Auto-hide controls: tap video to toggle, hide automatically when idle.
+  static const Duration _controlsHideDelay = Duration(seconds: 3);
+  bool _controlsVisible = true;
+  Timer? _controlsHideTimer;
+
   @override
   void initState() {
     super.initState();
@@ -180,6 +185,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       _player.stream.playing.listen((playing) {
         if (!mounted) return;
         setState(() => _isPlaying = playing);
+        if (playing) _showControlsTemporarily();
       }),
     );
   }
@@ -340,6 +346,32 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     } else {
       _player.play();
     }
+    _showControlsTemporarily();
+  }
+
+  /// Show controls again then schedule auto-hide.
+  void _showControlsTemporarily() {
+    if (!mounted) return;
+    if (!_controlsVisible) {
+      setState(() => _controlsVisible = true);
+    }
+    _controlsHideTimer?.cancel();
+    _controlsHideTimer = Timer(_controlsHideDelay, () {
+      if (!mounted) return;
+      if (_isPlaying) {
+        setState(() => _controlsVisible = false);
+      }
+    });
+  }
+
+  /// Tap on the video area to show/hide controls.
+  void _toggleControls() {
+    if (_controlsVisible) {
+      _controlsHideTimer?.cancel();
+      setState(() => _controlsVisible = false);
+    } else {
+      _showControlsTemporarily();
+    }
   }
 
   void _seekBy(Duration delta) {
@@ -354,6 +386,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       return;
     }
     _player.seek(target);
+    _showControlsTemporarily();
   }
 
   void _seekToFraction(double fraction) {
@@ -363,11 +396,13 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     }
     final millis = (duration.inMilliseconds * fraction).round();
     _player.seek(Duration(milliseconds: millis));
+    _showControlsTemporarily();
   }
 
   Future<void> _toggleFullscreen() async {
     final next = !_isFullscreen;
     setState(() => _isFullscreen = next);
+    _showControlsTemporarily();
     if (next) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -476,6 +511,11 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           fit: StackFit.expand,
           children: [
             _buildVideoLayer(),
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _toggleControls,
+              child: const SizedBox.expand(),
+            ),
             _buildFullscreenOverlay(),
           ],
         ),
@@ -522,6 +562,11 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         fit: StackFit.expand,
         children: [
           _buildVideoLayer(),
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _toggleControls,
+            child: const SizedBox.expand(),
+          ),
           _buildOverlay(),
         ],
       ),
@@ -560,7 +605,12 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   Widget _buildOverlay() {
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    return Stack(
+    return AnimatedOpacity(
+      opacity: _controlsVisible ? 1 : 0,
+      duration: const Duration(milliseconds: 200),
+      child: IgnorePointer(
+        ignoring: !_controlsVisible,
+        child: Stack(
       fit: StackFit.expand,
       children: [
         // Gradient tipis agar ikon tetap terbaca.
@@ -662,7 +712,9 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           bottom: 0,
           child: _buildProgressBar(screenWidth),
         ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -674,7 +726,12 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         widget.episodeName.isEmpty ? widget.title : widget.episodeName;
     final quality = (widget.qualityLabel ?? '').trim().toUpperCase();
 
-    return Stack(
+    return AnimatedOpacity(
+      opacity: _controlsVisible ? 1 : 0,
+      duration: const Duration(milliseconds: 200),
+      child: IgnorePointer(
+        ignoring: !_controlsVisible,
+        child: Stack(
       fit: StackFit.expand,
       children: [
         // Vignette agar kontrol tetap terbaca di atas adegan terang.
@@ -833,7 +890,9 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
             ),
           ),
         ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -1315,6 +1374,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   @override
   void dispose() {
     _saveWatchHistory();
+    _controlsHideTimer?.cancel();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
