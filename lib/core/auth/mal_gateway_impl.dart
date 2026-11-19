@@ -17,8 +17,17 @@ class MalGatewayImpl implements MalGateway {
   final MalAuthService _auth;
   final MalHttpClient _http;
 
+  /// Endpoint pembacaan list anime milik user (GET, masih valid di MAL v2).
   static const String _listUrl =
       'https://api.myanimelist.net/v2/users/@me/animelist';
+
+  /// Endpoint tulis status list per anime.
+  ///
+  /// Route lama `/v2/users/@me/animelist/{anime_id}` sudah dihapus oleh MAL
+  /// (balas 404 `not_found`). Sekarang write/delete memakai
+  /// `/v2/anime/{anime_id}/my_list_status`.
+  static const String _myListStatusUrl =
+      'https://api.myanimelist.net/v2/anime';
 
   @override
   Future<MalUser> login() => _auth.login();
@@ -41,7 +50,8 @@ class MalGatewayImpl implements MalGateway {
     return MalMapper.list(json);
   }
 
-  /// Update status/score list MAL memakai HTTP verb `PUT`.
+  /// Update status/score list MAL memakai HTTP `PUT` ke route
+  /// `/v2/anime/{anime_id}/my_list_status`.
   @override
   Future<void> upsert({
     required int malAnimeId,
@@ -50,25 +60,27 @@ class MalGatewayImpl implements MalGateway {
     int? numWatchedEpisodes,
   }) async {
     final token = await _auth.getValidAccessToken();
+    final statusText = _statusToText(status);
     final body = <String, String>{
-      'status': '$status',
+      'status': ?statusText,
       if (score != null) 'score': '$score',
       if (numWatchedEpisodes != null)
         'num_watched_episodes': '$numWatchedEpisodes',
     };
     await _http.putForm(
-      '$_listUrl/$malAnimeId',
+      '$_myListStatusUrl/$malAnimeId/my_list_status',
       body,
       headers: MalConfig.apiHeaders(token),
     );
   }
 
-  /// Hapus anime dari list MAL memakai HTTP verb `DELETE`.
+  /// Hapus anime dari list MAL memakai HTTP `DELETE` ke route
+  /// `/v2/anime/{anime_id}/my_list_status`.
   @override
   Future<void> delete(int malAnimeId) async {
     final token = await _auth.getValidAccessToken();
     await _http.deleteJson(
-      '$_listUrl/$malAnimeId',
+      '$_myListStatusUrl/$malAnimeId/my_list_status',
       MalConfig.apiHeaders(token),
     );
   }
@@ -81,4 +93,22 @@ class MalGatewayImpl implements MalGateway {
 
   @override
   Future<bool> isLoggedIn() => _auth.isLoggedIn();
+
+  /// MAL v2 menerima `status` sebagai string, bukan angka.
+  static String? _statusToText(int status) {
+    switch (status) {
+      case MalListStatus.watching:
+        return 'watching';
+      case MalListStatus.completed:
+        return 'completed';
+      case MalListStatus.onHold:
+        return 'on_hold';
+      case MalListStatus.dropped:
+        return 'dropped';
+      case MalListStatus.planToWatch:
+        return 'plan_to_watch';
+      default:
+        return null;
+    }
+  }
 }

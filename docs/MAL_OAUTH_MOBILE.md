@@ -57,8 +57,12 @@ scheme `animego`.
 
 ## Endpoint list (bukan OAuth)
 
-- Update: `PUT https://api.myanimelist.net/v2/users/@me/animelist/{anime_id}`
-- Delete: `DELETE https://api.myanimelist.net/v2/users/@me/animelist/{anime_id}`
+- Update: `PUT https://api.myanimelist.net/v2/anime/{anime_id}/my_list_status`
+- Delete: `DELETE https://api.myanimelist.net/v2/anime/{anime_id}/my_list_status`
+
+Catatan: route lama `/v2/users/@me/animelist/{anime_id}` sudah dihapus oleh MAL
+(balas 404 `not_found`). Body `PUT` memakai `status` sebagai string
+(`watching`, `completed`, `on_hold`, `dropped`, `plan_to_watch`).
 
 ## Validasi
 
