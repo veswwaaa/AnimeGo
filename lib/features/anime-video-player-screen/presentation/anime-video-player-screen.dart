@@ -68,7 +68,7 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
   /// Sinopsis anime (opsional, sesuai desain).
   final String? synopsis;
 
-  /// Baris metadata ringkas, mis. `Season 1 • Sub | Dub • 24m • 2024`.
+  /// Baris metadata ringkas, mis. `Season 1 â€¢ Sub | Dub â€¢ 24m â€¢ 2024`.
   final String? metaLine;
 
   /// Nama server aktif, mis. `BerkasDrive`.
@@ -147,6 +147,10 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   static const Duration _controlsHideDelay = Duration(seconds: 3);
   bool _controlsVisible = true;
   Timer? _controlsHideTimer;
+
+  // Double tap (gaya YouTube): double tap bagian kiri/kanan video untuk
+  // skip mundur/maju 10 detik tanpa memunculkan kontrol.
+  double _doubleTapLocalX = 0;
 
   @override
   void initState() {
@@ -374,6 +378,36 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     }
   }
 
+  /// Menyimpan posisi x lokal dari double tap terakhir.
+  void _onDoubleTapDown(TapDownDetails details) {
+    _doubleTapLocalX = details.localPosition.dx;
+  }
+
+  /// Double tap pada area video: skip 10 detik mundur (kiri) atau maju (kanan).
+  ///
+  /// Sengaja tidak memunculkan kontrol agar tetap cocok dengan request
+  /// "skip saat kontrol video sedang disembunyikan".
+  void _onDoubleTap(double width) {
+    if (width <= 0) return;
+    final isLeftHalf = _doubleTapLocalX < width / 2;
+    _seekSilently(
+      isLeftHalf ? const Duration(seconds: -10) : const Duration(seconds: 10),
+    );
+  }
+
+  /// Seek tanpa memunculkan kontrol.
+  void _seekSilently(Duration delta) {
+    final duration = _duration;
+    var target = _position + delta;
+    if (duration > Duration.zero && target > duration) {
+      target = duration;
+    }
+    if (target < Duration.zero) {
+      target = Duration.zero;
+    }
+    _player.seek(target);
+  }
+
   void _seekBy(Duration delta) {
     final target = _position + delta;
     final duration = _duration;
@@ -511,10 +545,16 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           fit: StackFit.expand,
           children: [
             _buildVideoLayer(),
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: _toggleControls,
-              child: const SizedBox.expand(),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _toggleControls,
+                  onDoubleTapDown: _onDoubleTapDown,
+                  onDoubleTap: () => _onDoubleTap(constraints.maxWidth),
+                  child: const SizedBox.expand(),
+                );
+              },
             ),
             _buildFullscreenOverlay(),
           ],
@@ -562,10 +602,16 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         fit: StackFit.expand,
         children: [
           _buildVideoLayer(),
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _toggleControls,
-            child: const SizedBox.expand(),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _toggleControls,
+                onDoubleTapDown: _onDoubleTapDown,
+                onDoubleTap: () => _onDoubleTap(constraints.maxWidth),
+                child: const SizedBox.expand(),
+              );
+            },
           ),
           _buildOverlay(),
         ],
