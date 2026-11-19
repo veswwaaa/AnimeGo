@@ -20,6 +20,9 @@ class Anime {
   /// ID komposit canonical: `providerId:localId`.
   String id;
 
+  /// ID anime di MyAnimeList. Null berarti sinkronisasi MAL dimatikan.
+  int? malId;
+
   Anime({
     required this.title,
     required this.imageUrl,
@@ -32,5 +35,6 @@ class Anime {
     this.synopsis = 'No synopsis available',
     this.providerId = '',
     this.id = '',
+    this.malId,
   });
 }

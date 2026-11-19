@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import 'package:animego/core/auth/mal_di.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dart';
 
@@ -85,6 +86,10 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
   /// Nomor episode yang sedang diputar.
   final int? currentEpisodeNumber;
 
+  /// ID anime di MyAnimeList. Null berarti sinkronisasi MAL dimatikan
+  /// (tidak ada pasangan anime di MyAnimeList).
+  final int? malAnimeId;
+
   /// Callback saat user memilih server lain.
   ///
   /// Mengembalikan URL stream baru (nullable = tidak berubah).
@@ -107,6 +112,7 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
     this.servers = const <String>[],
     this.episodes = const <PlayerEpisodeInfo>[],
     this.currentEpisodeNumber,
+    this.malAnimeId,
     this.onServerSelected,
     this.onEpisodeSelected,
   });
@@ -161,6 +167,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       _player.stream.position.listen((position) {
         if (!mounted) return;
         setState(() => _position = position);
+        _syncMalWatchProgress(position);
       }),
     );
     _subscriptions.add(
@@ -175,6 +182,32 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         setState(() => _isPlaying = playing);
       }),
     );
+  }
+
+  /// Sinkronisasi progress ke MyAnimeList (tanpa efek ke tampilan).
+  ///
+  /// Dipanggil saat posisi playback berubah; service sendiri yang menentukan
+  /// kapan rasio 80% tercapai dan hanya sekali per episode.
+  void _syncMalWatchProgress(Duration position) {
+    final malId = widget.malAnimeId;
+    if (malId == null || malId <= 0) return;
+
+    final episodeNumber = widget.currentEpisodeNumber;
+    if (episodeNumber == null || episodeNumber <= 0) return;
+
+    final duration = _duration > Duration.zero
+        ? _duration
+        : _player.state.duration;
+    if (duration <= Duration.zero) return;
+
+    MalDi.watchSyncService()
+        .onPlaybackProgress(
+          malAnimeId: malId,
+          episodeNumber: episodeNumber,
+          position: position,
+          duration: duration,
+        )
+        .catchError((_) {});
   }
 
   /// Menangkap error dari mpv supaya penyebab gagalnya tampil di layar.

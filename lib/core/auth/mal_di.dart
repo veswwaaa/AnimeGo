@@ -2,6 +2,7 @@ import 'mal_auth_provider.dart';
 import 'mal_auth_service.dart';
 import 'mal_gateway.dart';
 import 'mal_gateway_impl.dart';
+import 'mal_watch_sync_service.dart';
 
 /// Dependency injection sederhana untuk fitur MAL.
 ///
@@ -11,6 +12,11 @@ class MalDi {
 
   static MalGateway? _gatewayOverride;
   static MalAuthProvider? _providerOverride;
+
+  /// Instance shared supaya seluruh featurelayer melihat sesi login yang sama.
+  static MalGateway? _gatewayInstance;
+  static MalAuthProvider? _providerInstance;
+  static MalWatchSyncService? _watchSyncInstance;
 
   /// Inject dependency untuk test.
   static void overrideDependencies({
@@ -25,13 +31,28 @@ class MalDi {
   static void resetDependencies() {
     _gatewayOverride = null;
     _providerOverride = null;
+    _gatewayInstance = null;
+    _providerInstance = null;
+    _watchSyncInstance = null;
   }
 
   static MalGateway gateway() {
-    return _gatewayOverride ?? MalGatewayImpl(authService: MalAuthService());
+    final override = _gatewayOverride;
+    if (override != null) return override;
+    return _gatewayInstance ??= MalGatewayImpl(authService: MalAuthService());
   }
 
   static MalAuthProvider provider() {
-    return _providerOverride ?? MalAuthProvider(gateway: gateway());
+    final override = _providerOverride;
+    if (override != null) return override;
+    return _providerInstance ??= MalAuthProvider(gateway: gateway());
+  }
+
+  /// Service sinkronisasi progress tonton ke MyAnimeList.
+  static MalWatchSyncService watchSyncService() {
+    return _watchSyncInstance ??= MalWatchSyncService(
+      gateway: gateway(),
+      auth: provider(),
+    );
   }
 }

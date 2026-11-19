@@ -15,6 +15,7 @@ class AnimeDto {
     this.totalEpisodes,
     this.episodeListUrl,
     this.url,
+    this.malId,
     this.extra = const {},
   });
 
@@ -30,6 +31,9 @@ class AnimeDto {
   final int? totalEpisodes;
   final String? episodeListUrl;
   final String? url;
+
+  /// ID anime di MyAnimeList (null = fitur sinkronisasi MAL nonaktif).
+  final int? malId;
   final Map<String, dynamic> extra;
 
   Map<String, dynamic> toJson() => {
@@ -45,6 +49,7 @@ class AnimeDto {
     'totalEpisodes': totalEpisodes,
     'episodeListUrl': episodeListUrl,
     'url': url,
+    'malId': malId,
     'extra': extra,
   };
 }

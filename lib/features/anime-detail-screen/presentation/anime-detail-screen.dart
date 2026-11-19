@@ -134,6 +134,10 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     if (total != null && total > 0) {
       _anime.episodes = total;
     }
+    final malId = detail.malId;
+    if (malId != null && malId > 0) {
+      _anime.malId = malId;
+    }
   }
 
   /// Pesan error yang jelas untuk user (bukan halaman kosong).
@@ -229,6 +233,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           servers: serverLabels,
           episodes: _playerEpisodes,
           currentEpisodeNumber: episode.number,
+          malAnimeId: _anime.malId,
           onServerSelected: (serverName) => _resolveServerStream(
             episode,
             serverName,
@@ -320,6 +325,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
               .toList(growable: false),
           episodes: _playerEpisodes,
           currentEpisodeNumber: episode.number,
+          malAnimeId: _anime.malId,
         ),
       ),
     );

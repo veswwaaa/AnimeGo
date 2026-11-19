@@ -72,3 +72,22 @@ scheme `animego`.
 - Console MAL harus berada di mode **authorization code** (bukan implicit),
   dan redirect URI `animego://mal/cb` harus terdaftar.
 - Token tidak pernah dicetak ke log dan tidak disimpan di SharedPreferences.
+
+## Sinkronisasi progress tonton (80%)
+
+Fitur otomatis: saat durasi video yang diputar mencapai **80%**, episode
+tersebut otomatis masuk ke list MyAnimeList dengan `status=watching` dan
+`num_watched_episodes` sesuai nomor episode.
+
+Syarat:
+- User sudah login MyAnimeList (sesi MAL valid).
+- Anime punya `malId` dari backend kontrak v2 (kalau null, fitur dimatikan
+  diam-diam tanpa error).
+
+Implementasi:
+- `lib/core/auth/mal_watch_sync_service.dart` — trigger + idempotensi per
+  (anime, episode) agar tidak menembak rate limit 60 req/menit MAL.
+- Memakai `MalGateway.upsert()` (HTTP `PUT`), tidak ada request HTTP
+  langsung dari feature layer.
+- Dipicu dari `_player.stream.position` di
+  `anime-video-player-screen.dart`; tidak ada perubahan tampilan/UI.

@@ -54,6 +54,7 @@ AnimeDto animeDtoFromApiDetail(ApiAnimeDetail detail) {
     totalEpisodes: detail.totalEpisodes,
     url: detail.url,
     episodeListUrl: detail.episodeListUrl ?? detail.url,
+    malId: detail.malId,
     extra: <String, dynamic>{
       'source': provider,
       ...detail.extra,
@@ -82,6 +83,7 @@ AnimeDto animeDtoFromApiSearchItem(ApiSearchItem item) {
     totalEpisodes: item.totalEpisodes,
     url: item.url,
     episodeListUrl: item.url,
+    malId: item.malId,
     extra: <String, dynamic>{'source': item.provider},
   );
 }

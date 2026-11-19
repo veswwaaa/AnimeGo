@@ -248,6 +248,7 @@ class ApiSearchItem {
     this.rating,
     this.year,
     this.totalEpisodes,
+    this.malId,
     required this.url,
   });
 
@@ -262,6 +263,9 @@ class ApiSearchItem {
   final double? rating;
   final int? year;
   final int? totalEpisodes;
+
+  /// ID anime di MyAnimeList (null = belum bisa diresolusi backend).
+  final int? malId;
   final String url;
 
   factory ApiSearchItem.fromJson(Map<String, dynamic> json) {
@@ -277,6 +281,7 @@ class ApiSearchItem {
       rating: _asDouble(json['rating']),
       year: _asInt(json['year']),
       totalEpisodes: _asInt(json['totalEpisodes']),
+      malId: _asInt(json['malId']),
       url: json['url']?.toString() ?? '',
     );
   }
@@ -293,6 +298,7 @@ class ApiSearchItem {
     'rating': rating,
     'year': year,
     'totalEpisodes': totalEpisodes,
+    'malId': malId,
     'url': url,
   };
 }
@@ -340,6 +346,7 @@ class ApiAnimeDetail {
     required this.url,
     this.episodeListUrl,
     this.episodes = const [],
+    this.malId,
     this.extra = const {},
   });
 
@@ -360,6 +367,9 @@ class ApiAnimeDetail {
 
   /// Daftar episode (isi endpoint `/detail` dengan `includeEpisodes=true`).
   final List<ApiEpisode> episodes;
+
+  /// ID anime di MyAnimeList (null = belum bisa diresolusi backend).
+  final int? malId;
   final Map<String, dynamic> extra;
 
   factory ApiAnimeDetail.fromJson(Map<String, dynamic> json) {
@@ -380,6 +390,7 @@ class ApiAnimeDetail {
       totalEpisodes: _asInt(json['totalEpisodes']),
       url: json['url']?.toString() ?? '',
       episodeListUrl: _asString(json['episodeListUrl']),
+      malId: _asInt(json['malId']),
       episodes: rawEpisodes is List
           ? rawEpisodes
                 .whereType<Map<String, dynamic>>()
@@ -406,6 +417,7 @@ class ApiAnimeDetail {
     'url': url,
     'episodeListUrl': episodeListUrl,
     'episodes': episodes.map((episode) => episode.toJson()).toList(),
+    'malId': malId,
     'extra': extra,
   };
 }
