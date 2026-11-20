@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:animego/core/auth/mal_di.dart';
+import 'package:animego/core/player/player_controls_controller.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dart';
 
@@ -133,7 +134,15 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   String? _errorMessage;
 
   // State playback.
-  Duration _position = Duration.zero;
+  //
+  // Posisi playback memakai `ValueNotifier` (bukan `setState`) supaya tick
+  // tiap frame tidak membangun ulang seluruh overlay. Hanya bar progress dan
+  // teks timestamp yang subscribe lewat `ValueListenableBuilder`.
+  final PlayerControlsController _controls = PlayerControlsController();
+
+  /// Notifier posisi playback.
+  ValueNotifier<Duration> get _positionNotifier => _controls.position;
+
   Duration _duration = Duration.zero;
   bool _isPlaying = false;
   bool _isBuffering = false;
@@ -144,9 +153,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   String? _selectedTab;
 
   // Auto-hide controls: tap video to toggle, hide automatically when idle.
-  static const Duration _controlsHideDelay = Duration(seconds: 3);
-  bool _controlsVisible = true;
-  Timer? _controlsHideTimer;
+  // Logikanya dipisah ke `PlayerControlsController` supaya bisa diuji.
+  bool get _controlsVisible => _controls.visible;
 
   // Double tap (gaya YouTube): double tap bagian kiri/kanan video untuk
   // skip mundur/maju 10 detik tanpa memunculkan kontrol.
@@ -158,6 +166,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     _activeServer = (widget.serverName ?? '').trim();
     _player = Player();
     _videoController = VideoController(_player);
+    _controls.addListener(_handleControlsChanged);
     _listenToPlayerState();
     _listenToPlayerErrors();
     _initializePlayer();
@@ -175,7 +184,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     _subscriptions.add(
       _player.stream.position.listen((position) {
         if (!mounted) return;
-        setState(() => _position = position);
+        _controls.position.value = position;
         _syncMalWatchProgress(position);
       }),
     );
@@ -189,7 +198,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       _player.stream.playing.listen((playing) {
         if (!mounted) return;
         setState(() => _isPlaying = playing);
-        if (playing) _showControlsTemporarily();
+        _controls.onPlayingChanged(playing);
       }),
     );
   }
@@ -356,26 +365,19 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   /// Show controls again then schedule auto-hide.
   void _showControlsTemporarily() {
     if (!mounted) return;
-    if (!_controlsVisible) {
-      setState(() => _controlsVisible = true);
-    }
-    _controlsHideTimer?.cancel();
-    _controlsHideTimer = Timer(_controlsHideDelay, () {
-      if (!mounted) return;
-      if (_isPlaying) {
-        setState(() => _controlsVisible = false);
-      }
-    });
+    _controls.showTemporarily();
+  }
+
+  /// Rebuild layar saat visibilitas kontrol berubah.
+  void _handleControlsChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   /// Tap on the video area to show/hide controls.
   void _toggleControls() {
-    if (_controlsVisible) {
-      _controlsHideTimer?.cancel();
-      setState(() => _controlsVisible = false);
-    } else {
-      _showControlsTemporarily();
-    }
+    if (!mounted) return;
+    _controls.toggle();
   }
 
   /// Menyimpan posisi x lokal dari double tap terakhir.
@@ -388,28 +390,25 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   /// Sengaja tidak memunculkan kontrol agar tetap cocok dengan request
   /// "skip saat kontrol video sedang disembunyikan".
   void _onDoubleTap(double width) {
-    if (width <= 0) return;
-    final isLeftHalf = _doubleTapLocalX < width / 2;
-    _seekSilently(
-      isLeftHalf ? const Duration(seconds: -10) : const Duration(seconds: 10),
+    final delta = _controls.doubleTapDelta(
+      localX: _doubleTapLocalX,
+      width: width,
     );
+    if (delta == Duration.zero) return;
+    _seekSilently(delta);
   }
 
   /// Seek tanpa memunculkan kontrol.
   void _seekSilently(Duration delta) {
-    final duration = _duration;
-    var target = _position + delta;
-    if (duration > Duration.zero && target > duration) {
-      target = duration;
-    }
-    if (target < Duration.zero) {
-      target = Duration.zero;
-    }
+    final target = _controls.clampSeekTarget(
+      _positionNotifier.value + delta,
+      _duration,
+    );
     _player.seek(target);
   }
 
   void _seekBy(Duration delta) {
-    final target = _position + delta;
+    final target = _positionNotifier.value + delta;
     final duration = _duration;
     if (duration > Duration.zero && target > duration) {
       _player.seek(duration);
@@ -627,9 +626,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           controller: _videoController,
           fit: BoxFit.contain,
           // Kontrol digambar manual sesuai desain Penpot. Cluster ikon
-          // (subtitle/audio/speed/PiP/cast) tidak digambar manual; opsi
-          // tambahan tetap tersedia lewat `AdaptiveVideoControls` media_kit
-          // yang dipanggil dari interaksi pengguna.
+          // (subtitle/audio/speed) tidak digambar manual. Picture-in-Picture
+          // dibuang sesuai keputusan admin.
           controls: (state) => const SizedBox.shrink(),
         ),
         if (_isBuffering)
@@ -649,14 +647,13 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   }
 
   Widget _buildOverlay() {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-
     return AnimatedOpacity(
       opacity: _controlsVisible ? 1 : 0,
       duration: const Duration(milliseconds: 200),
       child: IgnorePointer(
         ignoring: !_controlsVisible,
-        child: Stack(
+        child: RepaintBoundary(
+          child: Stack(
       fit: StackFit.expand,
       children: [
         // Gradient tipis agar ikon tetap terbaca.
@@ -731,15 +728,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
-                style: const TextStyle(
-                  color: _PlayerTokens.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'Roboto Mono',
-                ),
-              ),
+              _buildTimeLabel(),
               _buildIconButton(
                 icon: Icons.fullscreen,
                 size: 36,
@@ -756,9 +745,10 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: _buildProgressBar(screenWidth),
+          child: _buildProgressBar(),
         ),
           ],
+          ),
         ),
       ),
     );
@@ -767,7 +757,6 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   /// Overlay landscape 844x390 sesuai board
   /// `Anime / Video Player Fullscreen (Landscape)`.
   Widget _buildFullscreenOverlay() {
-    final screenWidth = MediaQuery.sizeOf(context).width;
     final episodeTitle =
         widget.episodeName.isEmpty ? widget.title : widget.episodeName;
     final quality = (widget.qualityLabel ?? '').trim().toUpperCase();
@@ -777,7 +766,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       duration: const Duration(milliseconds: 200),
       child: IgnorePointer(
         ignoring: !_controlsVisible,
-        child: Stack(
+        child: RepaintBoundary(
+          child: Stack(
       fit: StackFit.expand,
       children: [
         // Vignette agar kontrol tetap terbaca di atas adegan terang.
@@ -897,28 +887,10 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
-                      style: const TextStyle(
-                        color: _PlayerTokens.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Roboto Mono',
-                      ),
-                    ),
+                    _buildTimeLabel(),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildIconButton(
-                          icon: Icons.picture_in_picture_alt,
-                          size: 44,
-                          iconSize: 22,
-                          tooltip: 'Picture in Picture',
-                          onPressed: () => _showSimpleSnack(
-                            'Picture in Picture tidak didukung perangkat ini',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         _buildIconButton(
                           icon: Icons.fullscreen_exit,
                           size: 44,
@@ -931,14 +903,33 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildProgressBar(screenWidth),
+                _buildProgressBar(),
               ],
             ),
           ),
         ),
           ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// Label timestamp yang hanya rebuild saat posisi berubah.
+  Widget _buildTimeLabel() {
+    return ValueListenableBuilder<Duration>(
+      valueListenable: _positionNotifier,
+      builder: (context, position, _) {
+        return Text(
+          '${_formatDuration(position)} / ${_formatDuration(_duration)}',
+          style: const TextStyle(
+            color: _PlayerTokens.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Roboto Mono',
+          ),
+        );
+      },
     );
   }
 
@@ -968,47 +959,56 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     );
   }
 
-  Widget _buildProgressBar(double screenWidth) {
-    final durationMs = _duration.inMilliseconds;
-    final played = durationMs <= 0
-        ? 0.0
-        : (_position.inMilliseconds / durationMs).clamp(0.0, 1.0);
+  Widget _buildProgressBar() {
+    return ValueListenableBuilder<Duration>(
+      valueListenable: _positionNotifier,
+      builder: (context, position, _) {
+        final durationMs = _duration.inMilliseconds;
+        final played = durationMs <= 0
+            ? 0.0
+            : (position.inMilliseconds / durationMs).clamp(0.0, 1.0);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (details) {
-        final box = context.findRenderObject() as RenderBox?;
-        if (box == null || box.size.width <= 0) return;
-        _seekToFraction(details.localPosition.dx / box.size.width);
-      },
-      child: SizedBox(
-        height: 18,
-        child: Stack(
-          alignment: Alignment.centerLeft,
-          children: [
-            Container(
-              height: 4,
-              color: _PlayerTokens.white.withValues(alpha: 0.18),
-            ),
-            Container(
-              height: 4,
-              width: screenWidth * played,
-              color: _PlayerTokens.accent,
-            ),
-            Positioned(
-              left: (screenWidth * played) - 7,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: const BoxDecoration(
-                  color: _PlayerTokens.accent,
-                  shape: BoxShape.circle,
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final barWidth = constraints.maxWidth;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                if (barWidth <= 0) return;
+                _seekToFraction(details.localPosition.dx / barWidth);
+              },
+              child: SizedBox(
+                height: 18,
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    Container(
+                      height: 4,
+                      color: _PlayerTokens.white.withValues(alpha: 0.18),
+                    ),
+                    Container(
+                      height: 4,
+                      width: barWidth * played,
+                      color: _PlayerTokens.accent,
+                    ),
+                    Positioned(
+                      left: (barWidth * played) - 7,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: const BoxDecoration(
+                          color: _PlayerTokens.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1420,7 +1420,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   @override
   void dispose() {
     _saveWatchHistory();
-    _controlsHideTimer?.cancel();
+    _controls.removeListener(_handleControlsChanged);
+    _controls.dispose();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
