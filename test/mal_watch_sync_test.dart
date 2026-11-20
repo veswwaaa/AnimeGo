@@ -12,6 +12,10 @@ class _FakeGateway implements MalGateway {
   final List<Map<String, dynamic>> upserts = <Map<String, dynamic>>[];
   bool throwOnUpsert = false;
 
+  /// Jeda sebelum mencatat upsert, dipakai untuk menguji in-flight guard.
+  Duration upsertDelay = Duration.zero;
+  int upsertCallCount = 0;
+
   @override
   Future<void> upsert({
     required int malAnimeId,
@@ -19,6 +23,10 @@ class _FakeGateway implements MalGateway {
     int? score,
     int? numWatchedEpisodes,
   }) async {
+    upsertCallCount++;
+    if (upsertDelay > Duration.zero) {
+      await Future<void>.delayed(upsertDelay);
+    }
     if (throwOnUpsert) {
       throw const MalAuthException('gagal');
     }
@@ -144,6 +152,88 @@ void main() {
       );
 
       expect(gateway.upserts, isEmpty);
+    });
+
+    test('tidak menembak request paralel untuk episode yang sama', () async {
+      final gateway = _FakeGateway()..upsertDelay = const Duration(milliseconds: 80);
+      final provider = MalAuthProvider(gateway: gateway);
+      await provider.restore();
+      final service = _service(gateway, provider);
+
+      // Panggil bersamaan tanpa menunggu: in-flight guard harus mencegah
+      // request kedua ke MAL untuk episode yang sama.
+      final futures = <Future<bool>>[
+        service.onPlaybackProgress(
+          malAnimeId: 21,
+          episodeNumber: 3,
+          position: const Duration(seconds: 90),
+          duration: const Duration(seconds: 100),
+        ),
+        service.onPlaybackProgress(
+          malAnimeId: 21,
+          episodeNumber: 3,
+          position: const Duration(seconds: 91),
+          duration: const Duration(seconds: 100),
+        ),
+        service.onPlaybackProgress(
+          malAnimeId: 21,
+          episodeNumber: 3,
+          position: const Duration(seconds: 92),
+          duration: const Duration(seconds: 100),
+        ),
+      ];
+
+      final results = await Future.wait(futures);
+
+      expect(gateway.upsertCallCount, 1);
+      expect(gateway.upserts.length, 1);
+      expect(results.where((value) => value).length, greaterThanOrEqualTo(1));
+    });
+
+    test('mengembalikan true kalau sinkronisasi terkirim', () async {
+      final gateway = _FakeGateway();
+      final provider = MalAuthProvider(gateway: gateway);
+      await provider.restore();
+      final service = _service(gateway, provider);
+
+      final sent = await service.onPlaybackProgress(
+        malAnimeId: 21,
+        episodeNumber: 3,
+        position: const Duration(seconds: 95),
+        duration: const Duration(seconds: 100),
+      );
+
+      expect(sent, isTrue);
+    });
+
+    test('mengembalikan false kalau belum login agar bisa dicoba lagi', () async {
+      final gateway = _FakeGateway(loggedIn: false);
+      final provider = MalAuthProvider(gateway: gateway);
+      await provider.restore();
+      final service = _service(gateway, provider);
+
+      final sent = await service.onPlaybackProgress(
+        malAnimeId: 21,
+        episodeNumber: 3,
+        position: const Duration(seconds: 95),
+        duration: const Duration(seconds: 100),
+      );
+
+      expect(sent, isFalse);
+
+      // Setelah user login, provider di-restore ulang supaya status sesi
+      // ikut berubah, lalu panggilan berikutnya harus berhasil.
+      gateway.loggedIn = true;
+      await provider.restore();
+      final retried = await service.onPlaybackProgress(
+        malAnimeId: 21,
+        episodeNumber: 3,
+        position: const Duration(seconds: 96),
+        duration: const Duration(seconds: 100),
+      );
+
+      expect(retried, isTrue);
+      expect(gateway.upserts.length, 1);
     });
 
     test('error gateway tidak melempar ke pemanggil', () async {

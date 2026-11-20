@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:animego/core/auth/mal_di.dart';
+import 'package:animego/core/auth/mal_watch_sync_service.dart';
 import 'package:animego/core/player/anime_video_controls_theme.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dart';
@@ -134,18 +135,35 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   String? _errorMessage;
 
   Duration _duration = Duration.zero;
-  bool _isBuffering = false;
+  /// Status buffering player.
+  ///
+  /// Dipakai [ValueNotifier] supaya event buffering dari mpv tidak
+  /// triggering rebuild seluruh layer video; hanya indikatornya saja.
+  final ValueNotifier<bool> _isBufferingNotifier = ValueNotifier<bool>(false);
+
+  /// True kalau sinkronisasi MAL untuk episode ini sudah pernah dikirim.
+  ///
+  /// Dipakai supaya pemanggilan MAL tidak dihitung ulang di setiap tick
+  /// posisi playback.
+  bool _malSyncSent = false;
 
   // State UI.
   final ValueNotifier<bool> _isFullscreenNotifier = ValueNotifier<bool>(false);
   bool get _isFullscreen => _isFullscreenNotifier.value;
-  String _activeServer = '';
+  /// Server aktif.
+  ///
+  /// Dipakai [ValueNotifier] karena `topButtonBar` pada tema kontrol media_kit
+  /// dibangun satu kali pada `initState`, sehingga widget di dalamnya tidak
+  /// ikut rebuild saat state layar berubah.
+  final ValueNotifier<String> _activeServerNotifier =
+      ValueNotifier<String>('');
+  String get _activeServer => _activeServerNotifier.value;
   String? _selectedTab;
 
   @override
   void initState() {
     super.initState();
-    _activeServer = (widget.serverName ?? '').trim();
+    _activeServerNotifier.value = (widget.serverName ?? '').trim();
     _player = Player();
     _videoController = VideoController(_player);
     _listenToPlayerState();
@@ -158,8 +176,17 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     _subscriptions.add(
       _player.stream.duration.listen((duration) {
         if (!mounted) return;
-        setState(() => _duration = duration);
+        if (_duration != duration) {
+          setState(() => _duration = duration);
+        }
         _seekToInitialPositionWhenReady(duration);
+      }),
+    );
+    _subscriptions.add(
+      _player.stream.buffering.listen((buffering) {
+        if (!mounted) return;
+        if (_isBufferingNotifier.value == buffering) return;
+        _isBufferingNotifier.value = buffering;
       }),
     );
     _subscriptions.add(
@@ -175,6 +202,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   /// Dipanggil saat posisi playback berubah; service sendiri yang menentukan
   /// kapan rasio 80% tercapai dan hanya sekali per episode.
   void _syncMalWatchProgress(Duration position) {
+    if (_malSyncSent) return;
+
     final malId = widget.malAnimeId;
     if (malId == null || malId <= 0) return;
 
@@ -186,6 +215,12 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
         : _player.state.duration;
     if (duration <= Duration.zero) return;
 
+    final ratio = position.inMilliseconds / duration.inMilliseconds;
+    if (ratio < MalWatchSyncService.watchThreshold) return;
+
+    // Tandai lebih dulu supaya tick berikutnya tidak memanggil service lagi.
+    _malSyncSent = true;
+
     MalDi.watchSyncService()
         .onPlaybackProgress(
           malAnimeId: malId,
@@ -193,7 +228,15 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           position: position,
           duration: duration,
         )
-        .catchError((_) {});
+        .then((sent) {
+          if (!sent) {
+            // Gagal terkirim (mis. belum login MAL): boleh mencoba lagi.
+            _malSyncSent = false;
+          }
+        })
+        .catchError((_) {
+          _malSyncSent = false;
+        });
   }
 
   /// Menangkap error dari mpv supaya penyebab gagalnya tampil di layar.
@@ -249,6 +292,14 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     await _setMpvProperty('demuxer-readahead-secs', '30');
     // MP4 non-faststart (moov di akhir file) butuh buffering lebih besar.
     await _setMpvProperty('demuxer-max-bytes', '64MiB');
+    // Decode hardware bila tersedia: memangkas beban CPU sehingga frame
+    // lebih stabil dan tidak mudah drop saat streaming.
+    await _setMpvProperty('hwdec', 'auto-safe');
+    // Frame pacing mengikuti refresh rate display: mengurangi getar/stutter
+    // pada video yang sedang berjalan.
+    await _setMpvProperty('video-sync', 'display-resample');
+    // Audio ikut di-resample supaya tetap sinkron dengan video.
+    await _setMpvProperty('audio-pitch-correction', 'yes');
 
     _player.open(
       Media(videoUri.toString(), httpHeaders: playbackHeaders),
@@ -400,7 +451,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
 
     final resolver = widget.onServerSelected;
     if (resolver == null) {
-      setState(() => _activeServer = selected);
+      _activeServerNotifier.value = selected;
       return;
     }
 
@@ -408,7 +459,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     if (!mounted) {
       return;
     }
-    setState(() => _activeServer = selected);
+    _activeServerNotifier.value = selected;
     if (newUrl != null && newUrl.isNotEmpty) {
       await _player.open(Media(newUrl), play: true);
     }
@@ -429,7 +480,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     if (_isFullscreen) {
       return Scaffold(
         backgroundColor: Colors.black,
-        body: _buildVideoLayer(),
+        body: RepaintBoundary(child: _buildVideoLayer()),
       );
     }
 
@@ -477,7 +528,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       padding: EdgeInsets.only(top: topInset),
       child: AspectRatio(
         aspectRatio: 16 / 9,
-        child: _buildVideoLayer(),
+        child: RepaintBoundary(child: _buildVideoLayer()),
       ),
     );
   }
@@ -501,17 +552,24 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
             controls: AdaptiveVideoControls,
           ),
         ),
-        if (_isBuffering)
-          const Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _PlayerTokens.white,
+        ValueListenableBuilder<bool>(
+          valueListenable: _isBufferingNotifier,
+          builder: (context, isBuffering, _) {
+            if (!isBuffering) return const SizedBox.shrink();
+            return const RepaintBoundary(
+              child: Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _PlayerTokens.white,
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
+        ),
         if (_errorMessage != null) _buildErrorView(_errorMessage!),
       ],
     );
@@ -573,11 +631,16 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                _buildActionPill(
-                  icon: Icons.dns_outlined,
-                  label: 'Server',
-                  value: _activeServer.isEmpty ? null : _activeServer,
-                  onTap: _openServerSheet,
+                ValueListenableBuilder<String>(
+                  valueListenable: _activeServerNotifier,
+                  builder: (context, server, _) {
+                    return _buildActionPill(
+                      icon: Icons.dns_outlined,
+                      label: 'Server',
+                      value: server.isEmpty ? null : server,
+                      onTap: _openServerSheet,
+                    );
+                  },
                 ),
                 if (quality.isNotEmpty) ...[
                   const SizedBox(width: 8),
@@ -702,11 +765,16 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _buildActionPill(
-            icon: Icons.dns_outlined,
-            label: 'Server',
-            value: _activeServer.isEmpty ? null : _activeServer,
-            onTap: _openServerSheet,
+          ValueListenableBuilder<String>(
+            valueListenable: _activeServerNotifier,
+            builder: (context, server, _) {
+              return _buildActionPill(
+                icon: Icons.dns_outlined,
+                label: 'Server',
+                value: server.isEmpty ? null : server,
+                onTap: _openServerSheet,
+              );
+            },
           ),
           const SizedBox(width: 8),
           _buildActionPill(
@@ -997,6 +1065,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   void dispose() {
     _saveWatchHistory();
     _isFullscreenNotifier.dispose();
+    _activeServerNotifier.dispose();
+    _isBufferingNotifier.dispose();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
