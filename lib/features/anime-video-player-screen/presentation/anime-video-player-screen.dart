@@ -466,10 +466,19 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   }
 
   /// Player 16:9 dengan kontrol bawaan `media_kit`.
+  ///
+  /// Area video digeser turun sebesar inset status bar / notch supaya
+  /// frame video dan top bar (tombol close) tidak tertimpa system UI
+  /// perangkat.
   Widget _buildPlayerSection() {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: _buildVideoLayer(),
+    final topInset = MediaQuery.of(context).padding.top;
+
+    return Padding(
+      padding: EdgeInsets.only(top: topInset),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: _buildVideoLayer(),
+      ),
     );
   }
 
@@ -521,7 +530,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           builder: (context, isFullscreen, _) {
             if (!isFullscreen) {
               return Align(
-                alignment: Alignment.centerLeft,
+                alignment: Alignment.topLeft,
                 child: _buildIconButton(
                   icon: Icons.close,
                   size: 36,
