@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,7 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:animego/core/auth/mal_di.dart';
-import 'package:animego/core/player/player_controls_controller.dart';
+import 'package:animego/core/player/anime_video_controls_theme.dart';
 import 'package:animego/core/utils/utils.dart';
 import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dart';
 
@@ -16,19 +16,20 @@ import 'package:animego/features/anime-detail-screen/data/google-blog-direct.dar
 // Implementasi sesuai board Penpot
 // `Anime / Video Player Screen` (390x844) dan
 // `Anime / Video Player Fullscreen (Landscape)` (844x390):
-// - Player 16:9 di atas (overlay custom: close, rewind/pause/forward,
-//   timestamp, fullscreen, progress bar crimson).
-// - Fullscreen landscape: top bar (back, judul episode, server switch,
-//   badge kualitas, menu), center controls, bottom bar (timestamp, PiP,
-//   keluar fullscreen, progress bar).
+// - Player 16:9 di atas.
+// - Kontrol video (play/pause, seek bar, posisi, tombol 10 detik,
+//   fullscreen) memakai kontrol BAWAAN `media_kit` melalui
+//   `AdaptiveVideoControls` + `MaterialVideoControlsTheme` custom
+//   (lihat `lib/core/player/anime_video_controls_theme.dart`).
+// - `Top Bar` (tombol close / back, judul episode, server switch, badge
+//   kualitas, menu) tetap digambar MANUAL sesuai desain Penpot dan
+//   dipasang lewat `topButtonBar` pada tema.
 // - Metadata episode (judul mono, baris metadata, sinopsis).
 // - Action pills: Server Switch (gold), My List, Download.
 // - Tabs: EPISODES / RELATED / COMMENTS dengan indikator aktif gold.
 // - Daftar episode vertikal (badge nomor + judul + subtitle + menu).
 //
-// Catatan: cluster ikon subtitle/audio/speed/PiP/cast TIDAK digambar manual
-// (sudah dihapus di desain); kontrol bawaan `media_kit` tetap dipakai
-// lewat `AdaptiveVideoControls` saat user memintanya.
+// Picture-in-Picture tidak digunakan (dihapus sesuai keputusan admin).
 // ==========================================
 
 /// Token warna dari board Penpot `Anime / Video Player Screen`.
@@ -37,7 +38,6 @@ class _PlayerTokens {
   static const Color surface = Color(0xFF12161B);
   static const Color surfaceStrong = Color(0xFF1B2026);
   static const Color pill = Color(0xFF181E24);
-  static const Color accent = Color(0xFFE50914);
   static const Color gold = Color(0xFFFACC15);
   static const Color textMuted = Color(0xFF9AA4B2);
   static const Color textBody = Color(0xFFCBD5E1);
@@ -69,7 +69,7 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
   /// Sinopsis anime (opsional, sesuai desain).
   final String? synopsis;
 
-  /// Baris metadata ringkas, mis. `Season 1 â€¢ Sub | Dub â€¢ 24m â€¢ 2024`.
+  /// Baris metadata ringkas, mis. `Season 1 - Sub | Dub - 24m - 2024`.
   final String? metaLine;
 
   /// Nama server aktif, mis. `BerkasDrive`.
@@ -133,32 +133,14 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
   bool _didSeekInitialPosition = false;
   String? _errorMessage;
 
-  // State playback.
-  //
-  // Posisi playback memakai `ValueNotifier` (bukan `setState`) supaya tick
-  // tiap frame tidak membangun ulang seluruh overlay. Hanya bar progress dan
-  // teks timestamp yang subscribe lewat `ValueListenableBuilder`.
-  final PlayerControlsController _controls = PlayerControlsController();
-
-  /// Notifier posisi playback.
-  ValueNotifier<Duration> get _positionNotifier => _controls.position;
-
   Duration _duration = Duration.zero;
-  bool _isPlaying = false;
   bool _isBuffering = false;
 
   // State UI.
-  bool _isFullscreen = false;
+  final ValueNotifier<bool> _isFullscreenNotifier = ValueNotifier<bool>(false);
+  bool get _isFullscreen => _isFullscreenNotifier.value;
   String _activeServer = '';
   String? _selectedTab;
-
-  // Auto-hide controls: tap video to toggle, hide automatically when idle.
-  // Logikanya dipisah ke `PlayerControlsController` supaya bisa diuji.
-  bool get _controlsVisible => _controls.visible;
-
-  // Double tap (gaya YouTube): double tap bagian kiri/kanan video untuk
-  // skip mundur/maju 10 detik tanpa memunculkan kontrol.
-  double _doubleTapLocalX = 0;
 
   @override
   void initState() {
@@ -166,13 +148,12 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     _activeServer = (widget.serverName ?? '').trim();
     _player = Player();
     _videoController = VideoController(_player);
-    _controls.addListener(_handleControlsChanged);
     _listenToPlayerState();
     _listenToPlayerErrors();
     _initializePlayer();
   }
 
-  /// Menangkap perubahan state player (posisi, durasi, buffering).
+  /// Menangkap perubahan state player (durasi, buffering, playing).
   void _listenToPlayerState() {
     _subscriptions.add(
       _player.stream.duration.listen((duration) {
@@ -184,21 +165,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     _subscriptions.add(
       _player.stream.position.listen((position) {
         if (!mounted) return;
-        _controls.position.value = position;
         _syncMalWatchProgress(position);
-      }),
-    );
-    _subscriptions.add(
-      _player.stream.buffering.listen((buffering) {
-        if (!mounted) return;
-        setState(() => _isBuffering = buffering);
-      }),
-    );
-    _subscriptions.add(
-      _player.stream.playing.listen((playing) {
-        if (!mounted) return;
-        setState(() => _isPlaying = playing);
-        _controls.onPlayingChanged(playing);
       }),
     );
   }
@@ -353,89 +320,11 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
 
   /* ------------------------------ Actions ------------------------------- */
 
-  void _togglePlayPause() {
-    if (_isPlaying) {
-      _player.pause();
-    } else {
-      _player.play();
-    }
-    _showControlsTemporarily();
-  }
-
-  /// Show controls again then schedule auto-hide.
-  void _showControlsTemporarily() {
-    if (!mounted) return;
-    _controls.showTemporarily();
-  }
-
-  /// Rebuild layar saat visibilitas kontrol berubah.
-  void _handleControlsChanged() {
+  Future<void> _toggleFullscreen() async {
+    final next = !_isFullscreenNotifier.value;
+    _isFullscreenNotifier.value = next;
     if (!mounted) return;
     setState(() {});
-  }
-
-  /// Tap on the video area to show/hide controls.
-  void _toggleControls() {
-    if (!mounted) return;
-    _controls.toggle();
-  }
-
-  /// Menyimpan posisi x lokal dari double tap terakhir.
-  void _onDoubleTapDown(TapDownDetails details) {
-    _doubleTapLocalX = details.localPosition.dx;
-  }
-
-  /// Double tap pada area video: skip 10 detik mundur (kiri) atau maju (kanan).
-  ///
-  /// Sengaja tidak memunculkan kontrol agar tetap cocok dengan request
-  /// "skip saat kontrol video sedang disembunyikan".
-  void _onDoubleTap(double width) {
-    final delta = _controls.doubleTapDelta(
-      localX: _doubleTapLocalX,
-      width: width,
-    );
-    if (delta == Duration.zero) return;
-    _seekSilently(delta);
-  }
-
-  /// Seek tanpa memunculkan kontrol.
-  void _seekSilently(Duration delta) {
-    final target = _controls.clampSeekTarget(
-      _positionNotifier.value + delta,
-      _duration,
-    );
-    _player.seek(target);
-  }
-
-  void _seekBy(Duration delta) {
-    final target = _positionNotifier.value + delta;
-    final duration = _duration;
-    if (duration > Duration.zero && target > duration) {
-      _player.seek(duration);
-      return;
-    }
-    if (target < Duration.zero) {
-      _player.seek(Duration.zero);
-      return;
-    }
-    _player.seek(target);
-    _showControlsTemporarily();
-  }
-
-  void _seekToFraction(double fraction) {
-    final duration = _duration;
-    if (duration <= Duration.zero) {
-      return;
-    }
-    final millis = (duration.inMilliseconds * fraction).round();
-    _player.seek(Duration(milliseconds: millis));
-    _showControlsTemporarily();
-  }
-
-  Future<void> _toggleFullscreen() async {
-    final next = !_isFullscreen;
-    setState(() => _isFullscreen = next);
-    _showControlsTemporarily();
     if (next) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -540,24 +429,7 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     if (_isFullscreen) {
       return Scaffold(
         backgroundColor: Colors.black,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            _buildVideoLayer(),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _toggleControls,
-                  onDoubleTapDown: _onDoubleTapDown,
-                  onDoubleTap: () => _onDoubleTap(constraints.maxWidth),
-                  child: const SizedBox.expand(),
-                );
-              },
-            ),
-            _buildFullscreenOverlay(),
-          ],
-        ),
+        body: _buildVideoLayer(),
       );
     }
 
@@ -593,42 +465,32 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     );
   }
 
-  /// Player 16:9 + overlay kontrol custom sesuai desain Penpot.
+  /// Player 16:9 dengan kontrol bawaan `media_kit`.
   Widget _buildPlayerSection() {
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _buildVideoLayer(),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _toggleControls,
-                onDoubleTapDown: _onDoubleTapDown,
-                onDoubleTap: () => _onDoubleTap(constraints.maxWidth),
-                child: const SizedBox.expand(),
-              );
-            },
-          ),
-          _buildOverlay(),
-        ],
-      ),
+      child: _buildVideoLayer(),
     );
   }
 
+  /// Layer video + kontrol bawaan `media_kit` + top bar manual.
   Widget _buildVideoLayer() {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Video(
-          controller: _videoController,
-          fit: BoxFit.contain,
-          // Kontrol digambar manual sesuai desain Penpot. Cluster ikon
-          // (subtitle/audio/speed) tidak digambar manual. Picture-in-Picture
-          // dibuang sesuai keputusan admin.
-          controls: (state) => const SizedBox.shrink(),
+        AnimeVideoControlsTheme(
+          player: _player,
+          isFullscreen: _isFullscreenNotifier,
+          onToggleFullscreen: () => _toggleFullscreen(),
+          topBar: _buildTopBar(),
+          child: Video(
+            controller: _videoController,
+            fit: BoxFit.contain,
+            // Kontrol video memakai widget BAWAAN media_kit
+            // (`AdaptiveVideoControls`), hanya `topButtonBar` yang digambar
+            // manual sesuai desain Penpot.
+            controls: AdaptiveVideoControls,
+          ),
         ),
         if (_isBuffering)
           const Center(
@@ -646,161 +508,45 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     );
   }
 
-  Widget _buildOverlay() {
-    return AnimatedOpacity(
-      opacity: _controlsVisible ? 1 : 0,
-      duration: const Duration(milliseconds: 200),
-      child: IgnorePointer(
-        ignoring: !_controlsVisible,
-        child: RepaintBoundary(
-          child: Stack(
-      fit: StackFit.expand,
-      children: [
-        // Gradient tipis agar ikon tetap terbaca.
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x66000000),
-                Color(0x00000000),
-                Color(0x99000000),
-              ],
-              stops: [0.0, 0.45, 1.0],
-            ),
-          ),
-        ),
+  /// Top bar manual sesuai desain Penpot.
+  ///
+  /// Portrait: tombol close di kiri atas.
+  /// Fullscreen landscape: back, judul episode, server switch, badge
+  /// kualitas, dan menu.
+  List<Widget> _buildTopBar() {
+    return <Widget>[
+      Expanded(
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _isFullscreenNotifier,
+          builder: (context, isFullscreen, _) {
+            if (!isFullscreen) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: _buildIconButton(
+                  icon: Icons.close,
+                  size: 36,
+                  iconSize: 22,
+                  tooltip: 'Tutup player',
+                  onPressed: () {
+                    _saveWatchHistory();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              );
+            }
 
-        // Top bar: tombol close.
-        Positioned(
-          top: 10,
-          left: 16,
-          child: _buildIconButton(
-            icon: Icons.close,
-            size: 36,
-            iconSize: 22,
-            tooltip: 'Tutup player',
-            onPressed: () {
-              _saveWatchHistory();
-              Navigator.of(context).pop();
-            },
-          ),
-        ),
+            final episodeTitle =
+                widget.episodeName.isEmpty ? widget.title : widget.episodeName;
+            final quality = (widget.qualityLabel ?? '').trim().toUpperCase();
 
-        // Center controls.
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildCircleButton(
-                icon: Icons.replay_10,
-                size: 56,
-                iconSize: 24,
-                tooltip: 'Mundur 10 detik',
-                onPressed: () => _seekBy(const Duration(seconds: -10)),
-              ),
-              const SizedBox(width: 32),
-              _buildCircleButton(
-                icon: _isPlaying ? Icons.pause : Icons.play_arrow,
-                size: 60,
-                iconSize: 30,
-                tooltip: _isPlaying ? 'Pause' : 'Play',
-                onPressed: _togglePlayPause,
-              ),
-              const SizedBox(width: 32),
-              _buildCircleButton(
-                icon: Icons.forward_10,
-                size: 56,
-                iconSize: 24,
-                tooltip: 'Maju 10 detik',
-                onPressed: () => _seekBy(const Duration(seconds: 10)),
-              ),
-            ],
-          ),
-        ),
-
-        // Bottom bar: timestamp + fullscreen.
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 12,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildTimeLabel(),
-              _buildIconButton(
-                icon: Icons.fullscreen,
-                size: 36,
-                iconSize: 22,
-                tooltip: 'Fullscreen',
-                onPressed: _toggleFullscreen,
-              ),
-            ],
-          ),
-        ),
-
-        // Progress bar.
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: _buildProgressBar(),
-        ),
-          ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Overlay landscape 844x390 sesuai board
-  /// `Anime / Video Player Fullscreen (Landscape)`.
-  Widget _buildFullscreenOverlay() {
-    final episodeTitle =
-        widget.episodeName.isEmpty ? widget.title : widget.episodeName;
-    final quality = (widget.qualityLabel ?? '').trim().toUpperCase();
-
-    return AnimatedOpacity(
-      opacity: _controlsVisible ? 1 : 0,
-      duration: const Duration(milliseconds: 200),
-      child: IgnorePointer(
-        ignoring: !_controlsVisible,
-        child: RepaintBoundary(
-          child: Stack(
-      fit: StackFit.expand,
-      children: [
-        // Vignette agar kontrol tetap terbaca di atas adegan terang.
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x80000000),
-                Color(0x00000000),
-                Color(0xB3000000),
-              ],
-              stops: [0.0, 0.45, 1.0],
-            ),
-          ),
-        ),
-
-        // Top bar: back, judul episode, server switch, badge kualitas, menu.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+            return Row(
               children: [
                 _buildIconButton(
                   icon: Icons.arrow_back,
-                  size: 44,
-                  iconSize: 24,
+                  size: 40,
+                  iconSize: 22,
                   tooltip: 'Keluar fullscreen',
-                  onPressed: _toggleFullscreen,
+                  onPressed: () => _toggleFullscreen(),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -831,106 +577,17 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
                 const SizedBox(width: 8),
                 _buildIconButton(
                   icon: Icons.more_vert,
-                  size: 44,
+                  size: 40,
                   iconSize: 22,
                   tooltip: 'Opsi lain',
                   onPressed: () => _showSimpleSnack('Opsi episode'),
                 ),
               ],
-            ),
-          ),
-        ),
-
-        // Center controls: rewind 10s / pause / forward 10s.
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildCircleButton(
-                icon: Icons.replay_10,
-                size: 64,
-                iconSize: 26,
-                tooltip: 'Mundur 10 detik',
-                onPressed: () => _seekBy(const Duration(seconds: -10)),
-              ),
-              const SizedBox(width: 32),
-              _buildCircleButton(
-                icon: _isPlaying ? Icons.pause : Icons.play_arrow,
-                size: 72,
-                iconSize: 34,
-                tooltip: _isPlaying ? 'Pause' : 'Play',
-                onPressed: _togglePlayPause,
-              ),
-              const SizedBox(width: 32),
-              _buildCircleButton(
-                icon: Icons.forward_10,
-                size: 64,
-                iconSize: 26,
-                tooltip: 'Maju 10 detik',
-                onPressed: () => _seekBy(const Duration(seconds: 10)),
-              ),
-            ],
-          ),
-        ),
-
-        // Bottom bar: timestamp, PiP, keluar fullscreen, progress bar.
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildTimeLabel(),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildIconButton(
-                          icon: Icons.fullscreen_exit,
-                          size: 44,
-                          iconSize: 24,
-                          tooltip: 'Keluar fullscreen',
-                          onPressed: _toggleFullscreen,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildProgressBar(),
-              ],
-            ),
-          ),
-        ),
-          ],
-          ),
+            );
+          },
         ),
       ),
-    );
-  }
-
-  /// Label timestamp yang hanya rebuild saat posisi berubah.
-  Widget _buildTimeLabel() {
-    return ValueListenableBuilder<Duration>(
-      valueListenable: _positionNotifier,
-      builder: (context, position, _) {
-        return Text(
-          '${_formatDuration(position)} / ${_formatDuration(_duration)}',
-          style: const TextStyle(
-            color: _PlayerTokens.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            fontFamily: 'Roboto Mono',
-          ),
-        );
-      },
-    );
+    ];
   }
 
   Widget _buildQualityBadge(String quality) {
@@ -959,59 +616,6 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     );
   }
 
-  Widget _buildProgressBar() {
-    return ValueListenableBuilder<Duration>(
-      valueListenable: _positionNotifier,
-      builder: (context, position, _) {
-        final durationMs = _duration.inMilliseconds;
-        final played = durationMs <= 0
-            ? 0.0
-            : (position.inMilliseconds / durationMs).clamp(0.0, 1.0);
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final barWidth = constraints.maxWidth;
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (details) {
-                if (barWidth <= 0) return;
-                _seekToFraction(details.localPosition.dx / barWidth);
-              },
-              child: SizedBox(
-                height: 18,
-                child: Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    Container(
-                      height: 4,
-                      color: _PlayerTokens.white.withValues(alpha: 0.18),
-                    ),
-                    Container(
-                      height: 4,
-                      width: barWidth * played,
-                      color: _PlayerTokens.accent,
-                    ),
-                    Positioned(
-                      left: (barWidth * played) - 7,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: const BoxDecoration(
-                          color: _PlayerTokens.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _buildIconButton({
     required IconData icon,
     required double size,
@@ -1029,32 +633,6 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
           width: size,
           height: size,
           alignment: Alignment.center,
-          child: Icon(icon, color: _PlayerTokens.white, size: iconSize),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCircleButton({
-    required IconData icon,
-    required double size,
-    required double iconSize,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) {
-    return Semantics(
-      button: true,
-      label: tooltip,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(size / 2),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _PlayerTokens.white.withValues(alpha: 0.12),
-          ),
           child: Icon(icon, color: _PlayerTokens.white, size: iconSize),
         ),
       ),
@@ -1406,22 +984,10 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     );
   }
 
-  static String _formatDuration(Duration duration) {
-    final total = duration.isNegative ? Duration.zero : duration;
-    final hours = total.inHours;
-    final minutes = total.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = total.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (hours > 0) {
-      return '$hours:$minutes:$seconds';
-    }
-    return '$minutes:$seconds';
-  }
-
   @override
   void dispose() {
     _saveWatchHistory();
-    _controls.removeListener(_handleControlsChanged);
-    _controls.dispose();
+    _isFullscreenNotifier.dispose();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
@@ -1429,3 +995,8 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
     super.dispose();
   }
 }
+
+
+
+
+
