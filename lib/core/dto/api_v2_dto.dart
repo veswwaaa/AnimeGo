@@ -510,6 +510,7 @@ class ApiEpisodeDetail {
     this.streamUrlDefaultServer,
     this.defaultQuality,
     this.defaultServerName,
+    this.streamHeaders = const <String, String>{},
     this.server = const [],
     this.kualitas = const [],
     this.extra = const {},
@@ -538,6 +539,12 @@ class ApiEpisodeDetail {
   /// Nama server default dari backend (nullable).
   final String? defaultServerName;
 
+  /// Header wajib saat player mengambil stream (mis. `Referer`).
+  ///
+  /// Backend mengirim ini untuk host yang menolak request tanpa referer
+  /// (mis. `vidcache.net:8161` untuk server yourupload).
+  final Map<String, String> streamHeaders;
+
   /// Daftar server streaming untuk episode ini.
   final List<ApiEpisodeServer> server;
 
@@ -547,6 +554,7 @@ class ApiEpisodeDetail {
 
   factory ApiEpisodeDetail.fromJson(Map<String, dynamic> json) {
     final rawExtra = json['extra'];
+    final rawHeaders = json['streamHeaders'];
     final rawServer = json['server'];
     return ApiEpisodeDetail(
       id: json['id']?.toString() ?? '',
@@ -562,6 +570,11 @@ class ApiEpisodeDetail {
           _asString(json['streamUrl720pdefaultserver']),
       defaultQuality: _asString(json['defaultQuality']),
       defaultServerName: _asString(json['defaultServerName']),
+      streamHeaders: rawHeaders is Map
+          ? rawHeaders.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            )
+          : const <String, String>{},
       server: rawServer is List
           ? rawServer
                 .whereType<Map<String, dynamic>>()
@@ -586,6 +599,7 @@ class ApiEpisodeDetail {
     'streamUrlDefaultServer': streamUrlDefaultServer,
     'defaultQuality': defaultQuality,
     'defaultServerName': defaultServerName,
+    'streamHeaders': streamHeaders,
     'server': server.map((item) => item.toJson()).toList(),
     'kualitas': kualitas,
     'extra': extra,

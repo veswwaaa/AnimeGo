@@ -45,6 +45,18 @@ class _PlayerTokens {
   static const Color white = Color(0xFFFFFFFF);
 }
 
+/// Hasil pemilihan server untuk playback: URL stream + header wajib.
+///
+/// Header berasal dari backend (`streamHeaders` pada kontrak v2) dan
+/// dipakai player agar host yang menolak request tanpa referer tetap
+/// bisa diakses.
+class PlayerStreamSelection {
+  const PlayerStreamSelection({required this.url, this.headers = const {}});
+
+  final String url;
+  final Map<String, String> headers;
+}
+
 /// Info episode untuk baris daftar episode di bawah player.
 class PlayerEpisodeInfo {
   const PlayerEpisodeInfo({
@@ -88,14 +100,21 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
   /// Nomor episode yang sedang diputar.
   final int? currentEpisodeNumber;
 
+  /// Header wajib untuk playback stream ini (dari API `streamHeaders`).
+  ///
+  /// Header ini digabung dengan header playback bawaan; nilai dari API
+  /// menang karena dictated oleh host (mis. `Referer` untuk yourupload).
+  final Map<String, String> streamHeaders;
+
   /// ID anime di MyAnimeList. Null berarti sinkronisasi MAL dimatikan
   /// (tidak ada pasangan anime di MyAnimeList).
   final int? malAnimeId;
 
   /// Callback saat user memilih server lain.
   ///
-  /// Mengembalikan URL stream baru (nullable = tidak berubah).
-  final Future<String?> Function(String serverName)? onServerSelected;
+  /// Mengembalikan stream baru beserta header wajib (nullable = tidak
+  /// berubah).
+  final Future<PlayerStreamSelection?> Function(String serverName)? onServerSelected;
 
   /// Callback saat user memilih episode lain dari daftar.
   final Future<void> Function(PlayerEpisodeInfo episode)? onEpisodeSelected;
@@ -115,6 +134,7 @@ class AnimeVideoPlayerScreen extends StatefulWidget {
     this.episodes = const <PlayerEpisodeInfo>[],
     this.currentEpisodeNumber,
     this.malAnimeId,
+    this.streamHeaders = const <String, String>{},
     this.onServerSelected,
     this.onEpisodeSelected,
   });
@@ -277,8 +297,9 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       return;
     }
 
-    final playbackHeaders = await VideoScraperService.buildPlaybackHeaders(
+    final playbackHeaders = await _buildPlaybackHeaders(
       videoUri.toString(),
+      widget.streamHeaders,
     );
 
     logDev(
@@ -305,6 +326,20 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       Media(videoUri.toString(), httpHeaders: playbackHeaders),
       play: true,
     );
+  }
+
+  /// Gabungkan header playback bawaan dengan header dari API.
+  ///
+  /// Header bawaan (User-Agent, cookie blogger, dll) tetap dipakai, tapi
+  /// header dari API menang agar `Referer`/`Origin` yang diwajibkan host
+  /// target tidak tertimpa header default.
+  Future<Map<String, String>> _buildPlaybackHeaders(
+    String url,
+    Map<String, String> apiHeaders,
+  ) async {
+    final base = await VideoScraperService.buildPlaybackHeaders(url);
+    if (apiHeaders.isEmpty) return base;
+    return <String, String>{...base, ...apiHeaders};
   }
 
   /// Mengatur properti mpv. Hanya tersedia di backend native.
@@ -455,13 +490,20 @@ class _AnimeVideoPlayerScreenState extends State<AnimeVideoPlayerScreen> {
       return;
     }
 
-    final newUrl = await resolver(selected);
+    final selection = await resolver(selected);
     if (!mounted) {
       return;
     }
     _activeServerNotifier.value = selected;
-    if (newUrl != null && newUrl.isNotEmpty) {
-      await _player.open(Media(newUrl), play: true);
+    if (selection != null && selection.url.isNotEmpty) {
+      final headers = await _buildPlaybackHeaders(
+        selection.url,
+        selection.headers,
+      );
+      await _player.open(
+        Media(selection.url, httpHeaders: headers),
+        play: true,
+      );
     }
   }
 

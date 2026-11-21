@@ -234,6 +234,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           episodes: _playerEpisodes,
           currentEpisodeNumber: episode.number,
           malAnimeId: _anime.malId,
+          streamHeaders: stream.headers,
           onServerSelected: (serverName) => _resolveServerStream(
             episode,
             serverName,
@@ -245,7 +246,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   }
 
   /// Ambil ulang stream episode (dipakai saat user ganti server).
-  Future<String?> _resolveServerStream(
+  Future<PlayerStreamSelection?> _resolveServerStream(
     EpisodeDto episode,
     String serverName,
   ) async {
@@ -262,7 +263,10 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
         );
         return null;
       }
-      return url;
+      return PlayerStreamSelection(
+        url: url,
+        headers: envelope.data?.headers ?? const <String, String>{},
+      );
     } catch (error) {
       logError(
         'Gagal mengganti server: $serverName',
@@ -326,6 +330,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           episodes: _playerEpisodes,
           currentEpisodeNumber: episode.number,
           malAnimeId: _anime.malId,
+          streamHeaders: stream.headers,
         ),
       ),
     );

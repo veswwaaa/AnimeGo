@@ -264,6 +264,7 @@ class NimegamiProviderV2 extends RestProviderBase {
       type: resolvedUrl.contains('.m3u8') ? 'hls' : 'direct',
       url: resolvedUrl,
       mirrors: mirrors,
+      headers: detail.streamHeaders,
     );
 
     _streamCache[cacheKey] = _CachedStream(stream);
